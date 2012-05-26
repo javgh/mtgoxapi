@@ -1,4 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
+module StreamParsing
+    ( parseStreamLine
+    , StreamMessage(..)
+    ) where
 
 import Control.Applicative
 import Control.Monad
@@ -12,9 +16,6 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified System.IO as IO
-
-dataStreamHost = "127.0.0.1"
-dataStreamPort = PortNumber 10508
 
 data DepthType = Ask | Bid
                  deriving (Show)
@@ -51,10 +52,10 @@ parseDepth depth = case extractDepthData depth of
     Just (priceV, volumeV, depthType) -> do
         priceS <- parseJSON priceV :: Parser String
         volumeS <- parseJSON volumeV :: Parser String
-        return $ DepthUpdateUSD { duPrice = read priceS
-                                , duVolume = read volumeS
-                                , duType = depthType
-                                }
+        return DepthUpdateUSD { duPrice = read priceS
+                              , duVolume = read volumeS
+                              , duType = depthType
+                              }
     Nothing -> mzero
 
 extractDepthData o = do
@@ -74,10 +75,10 @@ parseTicker ticker = case extractTickerData ticker of
         buyS <- parseJSON buyV :: Parser String
         sellS <- parseJSON sellV :: Parser String
         lastS <- parseJSON lastV :: Parser String
-        return $ TickerUpdateUSD { tuBid = read buyS
-                                 , tuAsk = read sellS
-                                 , tuLast = read lastS
-                                 }
+        return TickerUpdateUSD { tuBid = read buyS
+                               , tuAsk = read sellS
+                               , tuLast = read lastS
+                               }
     Nothing -> mzero
 
 extractTickerData :: (IsString k, Ord k) => M.Map k Value -> Maybe (Value, Value, Value)
@@ -120,9 +121,7 @@ collapseErrors (Left err) = Left err
 collapseErrors (Right (Error err)) = Left err
 collapseErrors (Right (Success payload)) = Right payload
 
-main = withSocketsDo $ do
-    h <- connectTo dataStreamHost dataStreamPort
-    IO.hSetBuffering h IO.LineBuffering
-    forever $ do
-        streamMessage <- parseLine <$> BS.hGetLine h
-        print streamMessage
+parseStreamLine :: BS.ByteString -> StreamMessage
+parseStreamLine line = case parseLine line of
+    Right msg -> msg
+    Left _ -> OtherMessage

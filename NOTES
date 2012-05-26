@@ -102,3 +102,16 @@ Just
   \"current_page\":1,
   \"max_page\":1,
   \"max_results\":50}}"
+
+initial command:
+  "{\"op\":\"unsubscribe\",\"channel\":\"dbf1dee9-4f2e-4a08-8cb7-748919a71b21\"}"
+
+Haddock:
+  -- |
+  -- How to use:
+  --
+  -- > main :: IO ()
+  -- > main = do
+  -- >     getTickerStatus <- initTickerMonitor
+  -- >     getTickerStatus >>= print
+  --
