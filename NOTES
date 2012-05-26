@@ -1,0 +1,104 @@
+Handshake für neuere Version von Websockets:
+
+clientHandshake = "GET /mtgox HTTP/1.1\r\n"
+    ++ "Upgrade: WebSocket\r\n"
+    ++ "Connection: Upgrade\r\n"
+    ++ "Host: websocket.mtgox.com\r\n"
+    ++ "Origin: null\r\n"
+    ++ "Sec-WebSocket-Version: 6\r\n"
+    ++ "Sec-WebSocket-Origin: http://pmx\r\n"
+    ++ "Sec-WebSocket-Extensions: deflate-stream\r\n"
+    ++ "Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\r\n\r\n"
+
+https://socketio.mtgox.com/socket.io/1/
+  21054427291093390799:60:60:websocket,htmlfile,xhr-polling,jsonp-polling
+
+-> wss://socketio.mtgox.com/socket.io/1/websocket/21054427291093390799
+
+Socket.IO and non-socket.IO websocket client
+  https://groups.google.com/forum/#!topic/socket_io/pOUGVKOKy94
+  Socket.IO specs: https://github.com/learnboost/socket.io-spec
+
+Websocket _server_ in Haskell:
+  http://jaspervdj.be/websockets/
+
+https://github.com/Gottox/socket.io-java-client
+
+evtl. http-conduit
+  http://www.yesodweb.com/book/http-conduit
+
+API-Calls: Submit an order
+  Just "{\"result\":\"success\",\"return\":\"34543c99-9533-418d-541e-e58ca9c33088\"}"
+
+  prefer_fiat_fee=1
+
+API-Calls: Order result
+
+Just
+  "{\"result\":\"success\",
+  \"return\":{\"order_id\":\"8d86b559-9551-43ef-95dd-d6c6eb0575bb\",
+  \"trades\":[{\"trade_id\":\"1337342838083902\",
+  \"primary\":\"Y\",
+  \"currency\":\"USD\",
+  \"type\":\"bid\",
+  \"properties\":\"market\",
+  \"item\":\"BTC\",
+  \"amount\":{\"value\":\"0.01000000\",
+  \"value_int\":\"1000000\",
+  \"display\":\"0.01000000\\u00a0BTC\",
+  \"display_short\":\"0.01\\u00a0BTC\",
+  \"currency\":\"BTC\"},
+  \"price\":{\"value\":\"5.12298\",
+  \"value_int\":\"512298\",
+  \"display\":\"$5.12298\",
+  \"display_short\":\"$5.12\",
+  \"currency\":\"USD\"},
+  \"date\":\"2012-05-18 12:07:18\"}],
+  \"total_amount\":{\"value\":\"0.01000000\",
+  \"value_int\":\"1000000\",
+  \"display\":\"0.01000000\\u00a0BTC\",
+  \"display_short\":\"0.01\\u00a0BTC\",
+  \"currency\":\"BTC\"}}}"
+
+API-Calls: Wallet history - gefiltert auf eine Trade-ID
+
+Just
+  "{\"result\":\"success\",
+  \"return\":{\"records\":\"2\",
+  \"result\":[{\"Index\":\"38\",
+  \"Date\":1337342838,
+  \"Type\":\"fee\",
+  \"Value\":{\"value\":\"0.00031\",
+  \"value_int\":\"31\",
+  \"display\":\"$0.00031\",
+  \"display_short\":\"$0.00\",
+  \"currency\":\"USD\"},
+  \"Balance\":{\"value\":\"15.34180\",
+  \"value_int\":\"1534180\",
+  \"display\":\"$15.34180\",
+  \"display_short\":\"$15.34\",
+  \"currency\":\"USD\"},
+  \"Info\":\"BTC bought: [tid:1337342838083902] 0.01000000\\u00a0BTC at $5.12298 (0.6% fee)\",
+  \"Link\":[\"472e197e-e267-489e-095e-4dd16a44e07b\",
+  \"Money_Trade\",
+  \"1337342838083902\"]},
+  {\"Index\":\"37\",
+  \"Date\":1337342838,
+  \"Type\":\"spent\",
+  \"Value\":{\"value\":\"0.05123\",
+  \"value_int\":\"5123\",
+  \"display\":\"$0.05123\",
+  \"display_short\":\"$0.05\",
+  \"currency\":\"USD\"},
+  \"Balance\":{\"value\":\"15.34211\",
+  \"value_int\":\"1534211\",
+  \"display\":\"$15.34211\",
+  \"display_short\":\"$15.34\",
+  \"currency\":\"USD\"},
+  \"Info\":\"BTC bought: [tid:1337342838083902] 0.01000000\\u00a0BTC at $5.12298\",
+  \"Link\":[\"96202d87-7de8-4dc6-f5b8-bf1e5465bcdc\",
+  \"Money_Trade\",
+  \"1337342838083902\"]}],
+  \"current_page\":1,
+  \"max_page\":1,
+  \"max_results\":50}}"
