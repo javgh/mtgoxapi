@@ -1,5 +1,6 @@
 import Control.Concurrent
 import Control.Monad
+
 import MtGoxStream
 import TickerMonitor
 

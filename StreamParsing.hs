@@ -12,7 +12,7 @@ import Data.String
 import Network
 
 import qualified Data.Attoparsec as AP
-import qualified Data.ByteString as BS
+import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified System.IO as IO
@@ -28,12 +28,18 @@ data StreamMessage = TickerUpdateUSD { tuBid :: Integer
                                       , duVolume :: Integer
                                       , duType :: DepthType
                                       }
+                     | Subscribed { sChannel :: T.Text }
+                     | Unsubscribed { usChannel :: T.Text }
                      | OtherMessage
                      deriving (Show)
 
 instance FromJSON StreamMessage
   where
     parseJSON (Object o) = case getOperation o of
+        Just ("subscribe", subscribe) ->
+            Subscribed <$> subscribe .: "channel"
+        Just ("unsubscribe", unsubscribe) ->
+            Unsubscribed <$> unsubscribe .: "channel"
         Just ("ticker", ticker) -> parseTicker ticker
         Just ("depth", depth) -> parseDepth depth
         Just _ -> return OtherMessage
@@ -43,10 +49,14 @@ instance FromJSON StreamMessage
 getOperation ::  M.Map T.Text Value -> Maybe (T.Text, Object)
 getOperation o = do
     op' <- M.lookup "op" o >>= extractText
-    guard (op' == "private")
-    op <- M.lookup "private" o >>= extractText
-    payload <- M.lookup op o >>= extractObject
-    return (op, payload)
+    case op' of
+        "private" -> do
+            op <- M.lookup "private" o >>= extractText
+            payload <- M.lookup op o >>= extractObject
+            return (op, payload)
+        "subscribe" -> return (op', o)
+        "unsubscribe" -> return (op', o)
+        _ -> fail "unknown operation"
 
 parseDepth depth = case extractDepthData depth of
     Just (priceV, volumeV, depthType) -> do
@@ -110,10 +120,10 @@ expectedCurrency = "USD"
 expectedPrecision :: Integer
 expectedPrecision = 5
 
-parseLine :: BS.ByteString -> Either String StreamMessage
+parseLine :: B.ByteString -> Either String StreamMessage
 parseLine = collapseErrors . parseStreamMessage
   where
-    parseStreamMessage :: BS.ByteString -> Either String (Result StreamMessage)
+    parseStreamMessage :: B.ByteString -> Either String (Result StreamMessage)
     parseStreamMessage = AP.parseOnly (fromJSON <$> json)
 
 collapseErrors :: Either String (Result b) -> Either String b
@@ -121,7 +131,7 @@ collapseErrors (Left err) = Left err
 collapseErrors (Right (Error err)) = Left err
 collapseErrors (Right (Success payload)) = Right payload
 
-parseStreamLine :: BS.ByteString -> StreamMessage
+parseStreamLine :: B.ByteString -> StreamMessage
 parseStreamLine line = case parseLine line of
     Right msg -> msg
     Left _ -> OtherMessage

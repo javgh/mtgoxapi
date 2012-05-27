@@ -62,6 +62,8 @@ Just
 
 API-Calls: Wallet history - gefiltert auf eine Trade-ID
 
+Private per-account messages: Updates to the user's wallet balance.
+
 Just
   "{\"result\":\"success\",
   \"return\":{\"records\":\"2\",
