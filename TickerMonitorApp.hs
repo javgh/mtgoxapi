@@ -7,9 +7,9 @@ import TickerMonitor
 
 main :: IO ()
 main = do
-    (tickerHook, getTickerStatus) <- initTickerMonitor
-    tid <- initMtGoxStream [ tickerHook
-                           , channelJoinerHook [mtGoxTickerChannel]
+    (tickerHookSetup, getTickerStatus) <- initTickerMonitor
+    tid <- initMtGoxStream [ tickerHookSetup
+                           , channelJoinerHookSetup [mtGoxTickerChannel]
                            ]
     forever $ do
         getTickerStatus >>= print

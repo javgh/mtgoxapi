@@ -8,6 +8,7 @@ import Control.Concurrent
 import Control.Watchdog
 import Data.Time.Clock
 
+import HookUtils
 import StreamCommand
 import StreamParsing
 
@@ -46,8 +47,11 @@ getTickerStatus' store = do
       | age >= 60 && age <= 300 = FailedImmediately "Data stale"    -- will retry
       | otherwise = CompletedSuccessfully TickerUnavailable     -- give up
 
-tickerStreamMessageHook :: MVar (Maybe TickerStatus) -> StreamMessage -> StreamWriter -> IO ()
-tickerStreamMessageHook tickerStore (update@TickerUpdateUSD {}) _ = do
+tickerStreamMessageHookSetup :: MVar (Maybe TickerStatus) -> StreamWriter -> IO (Hook)
+tickerStreamMessageHookSetup tickerStore _ = return $ tickerStreamMessageHook tickerStore
+
+tickerStreamMessageHook :: MVar (Maybe TickerStatus) -> StreamMessage -> IO ()
+tickerStreamMessageHook tickerStore (update@TickerUpdateUSD {}) = do
     now <- getCurrentTime
     let tickerStatus = TickerStatus { tsTimestamp = now
                                     , tsBid = tuBid update
@@ -57,7 +61,7 @@ tickerStreamMessageHook tickerStore (update@TickerUpdateUSD {}) _ = do
                                     }
     _ <- swapMVar tickerStore (Just tickerStatus)
     return ()
-tickerStreamMessageHook tickerStore _ _ = return ()
+tickerStreamMessageHook tickerStore _ = return ()
 
 
 -- | Will start a thread that monitors Mt.Gox's ticker
@@ -72,9 +76,9 @@ tickerStreamMessageHook tickerStore _ _ = return ()
 --   * a function that can be used to access the latest ticker status in a safe way
 --     (it will ensure that fresh data is returned).
 --
-initTickerMonitor :: IO (StreamMessage -> StreamWriter -> IO (), IO TickerStatus)
+initTickerMonitor :: IO (HookSetup, IO TickerStatus)
 initTickerMonitor = do
     store <- newMVar Nothing
-    let hook = tickerStreamMessageHook store
+    let hookSetup = tickerStreamMessageHookSetup store
         f = getTickerStatus store
-    return (hook, f)
+    return (hookSetup, f)
