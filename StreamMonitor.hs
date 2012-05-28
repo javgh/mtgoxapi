@@ -5,18 +5,21 @@ import Control.Concurrent
 import Control.Monad
 
 import AuthCommand
+import AuthCommandReplyParsing
 import ChannelJoiner
 import MtGoxStream
 import StreamCommand
+import StreamParsing
 
 debugHookSetup writer = do
     forkIO $ do
         threadDelay 3000000
         nonce <- getNonce
-        writer (PrivateInfo { piNonce = nonce })
+        writer PrivateInfo { piNonce = nonce }
     return debugHook
 
-debugHook = print
+debugHook (CallResult { crResult = crResult }) = print $ parseAuthCommandReply crResult
+debugHook msg = print msg
 
 main :: IO ()
 main = do

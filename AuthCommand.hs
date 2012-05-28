@@ -104,8 +104,3 @@ prepareAuthCommand authCmd nonce =
               , "call" .= signedCall
               , "context" .= ("mtgox.com" :: T.Text)
               ]
-
---debugCmd = AuthCommand { acCall = "private/info"
---                       , acParameters = []
---                       , acIsGeneric = True
---                       }

@@ -47,7 +47,12 @@ socketLoop hookSetups = do
             mapM_ (\hook -> hook streamMessage) hooks
 
 writer :: Handle -> StreamCommand -> IO ()
-writer h cmd = BL.hPutStr h (encodeStreamCommand cmd) >> BL.hPutStr h "\n"
+writer h cmd = do
+    _ <- try go :: IO (Either IOException ())
+    return ()   -- ignore any exceptions; they should hopefully soon
+                -- be caught on socketLoop's thread as well
+  where
+    go = BL.hPutStr h (encodeStreamCommand cmd) >> BL.hPutStr h "\n"
 
 -- | Starts a thread that will connect to the data stream
 -- from Mt. Gox and call the supplied hook setups once with a writer

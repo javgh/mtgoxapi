@@ -30,6 +30,9 @@ data StreamMessage = TickerUpdateUSD { tuBid :: Integer
                                       }
                      | Subscribed { sChannel :: T.Text }
                      | Unsubscribed { usChannel :: T.Text }
+                     | CallResult { crID :: T.Text
+                                  , crResult :: Value
+                                  }
                      | OtherMessage
                      deriving (Show)
 
@@ -40,6 +43,8 @@ instance FromJSON StreamMessage
             Subscribed <$> subscribe .: "channel"
         Just ("unsubscribe", unsubscribe) ->
             Unsubscribed <$> unsubscribe .: "channel"
+        Just ("result", result) ->
+            CallResult <$> result .: "id" <*> result .: "result"
         Just ("ticker", ticker) -> parseTicker ticker
         Just ("depth", depth) -> parseDepth depth
         Just _ -> return OtherMessage
@@ -56,6 +61,7 @@ getOperation o = do
             return (op, payload)
         "subscribe" -> return (op', o)
         "unsubscribe" -> return (op', o)
+        "result" -> return (op', o)
         _ -> fail "unknown operation"
 
 parseDepth depth = case extractDepthData depth of
@@ -116,9 +122,6 @@ extractText _ = Nothing
 
 expectedCurrency :: Value
 expectedCurrency = "USD"
-
-expectedPrecision :: Integer
-expectedPrecision = 5
 
 parseLine :: B.ByteString -> Either String StreamMessage
 parseLine = collapseErrors . parseStreamMessage
