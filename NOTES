@@ -117,3 +117,24 @@ Haddock:
   -- >     getTickerStatus <- initTickerMonitor
   -- >     getTickerStatus >>= print
   --
+
+op:call
+
+{
+    "op":"call"
+    "id": <nonce>
+    "call": base-64 kodierter String:
+        <API-Key ohne Bindestriche>
+        <HMAC-signierte Version von folgendem Text>
+        <JSON-Array:
+            {
+                "id": <nonce>
+                "call": <z.B. private/info>
+                "nonce": <nonce>
+                "params": <leer oder Parameter-Array>
+                "item": BTC     ?
+                "currency": USD     ?
+            }
+        >
+    "context":"mtgox.com"
+}
