@@ -7,4 +7,4 @@ import StreamCommand
 import StreamParsing
 
 type Hook = StreamMessage -> IO ()
-type HookSetup = StreamWriter -> IO (Hook)
+type HookSetup = StreamWriter -> IO Hook

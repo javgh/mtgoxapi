@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module AuthCommand
-    ( prepareAuthCommand
-    , debugCmd
+    ( AuthCommand (..)
+    , prepareAuthCommand
+    , getNonce
     ) where
 
 -- {
@@ -30,12 +31,13 @@ import Data.Time.Clock.POSIX
 import Data.Word
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 
 dash :: Word8
-dash = B.head $ "-"
+dash = B.head "-"
 
 hardcodedAuthKey :: B.ByteString
 hardcodedAuthKey = "5be9c2b8-6f85-408d-a8de-18db2f5fc3af"
@@ -72,33 +74,38 @@ prepareCallPayload (AuthCommand { acCall = acCall
                                  ]
     in object (alwaysPresent ++ optionalAddon)
 
+fromRight :: String -> Either t t1 -> t1
 fromRight msg (Left _) = error msg
 fromRight _ (Right a) = a
 
+fromFst :: String -> (B.ByteString, B.ByteString) -> B.ByteString
+fromFst msg (a, b)
+  | B.null b  = a
+  | otherwise = error msg
+
 createSignedCall :: ToJSON a => AuthCommand -> a -> B.ByteString
 createSignedCall authCmd nonce =
-    let errMsg arg = arg ++ " needs to be encoded in base 64"
+    let errMsg arg base = arg ++ " needs to be encoded in base " ++ base
         authKeyFiltered = B.filter (/= dash) hardcodedAuthKey
-        authKeyDecoded = BL.fromChunks [ fromRight (errMsg "authKey") $
-                                         B64.decode authKeyFiltered ]
-        authSecretDecoded = BL.fromChunks [ fromRight (errMsg "authSecret") $
+        authKeyDecoded = BL.fromChunks [ fromFst (errMsg "authKey" "16") $
+                                         B16.decode authKeyFiltered ]
+        authSecretDecoded = BL.fromChunks [ fromRight (errMsg "authSecret" "64") $
                                             B64.decode hardcodedAuthSecret ]
         call = encode $ prepareCallPayload authCmd nonce
         hmac = bytestringDigest $ hmacSha512 authSecretDecoded call
         payload = authKeyDecoded `BL.append` hmac `BL.append` call
     in B64.encode . foldl1 B.append $ BL.toChunks payload
 
-prepareAuthCommand :: AuthCommand -> IO Value
-prepareAuthCommand authCmd = do
-    nonce <- getNonce
+prepareAuthCommand :: ToJSON a => AuthCommand -> a -> Value
+prepareAuthCommand authCmd nonce =
     let signedCall = createSignedCall authCmd nonce
-    return $ object [ "op" .= ("call" :: T.Text)
-                    , "id" .= nonce
-                    , "call" .= signedCall
-                    , "context" .= ("mtgox.com" :: T.Text)
-                    ]
+    in object [ "op" .= ("call" :: T.Text)
+              , "id" .= nonce
+              , "call" .= signedCall
+              , "context" .= ("mtgox.com" :: T.Text)
+              ]
 
-debugCmd = AuthCommand { acCall = "private/info"
-                       , acParameters = []
-                       , acIsGeneric = True
-                       }
+--debugCmd = AuthCommand { acCall = "private/info"
+--                       , acParameters = []
+--                       , acIsGeneric = True
+--                       }

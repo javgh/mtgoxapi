@@ -10,7 +10,7 @@ import HookUtils
 import StreamCommand
 import StreamParsing
 
-channelJoinerHookSetup :: [T.Text] -> StreamWriter -> IO (Hook)
+channelJoinerHookSetup :: [T.Text] -> StreamWriter -> IO Hook
 channelJoinerHookSetup channels writer = return $ channelJoinerHook channels writer
 
 channelJoinerHook :: [T.Text] -> StreamWriter -> StreamMessage -> IO ()

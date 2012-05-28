@@ -1,13 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
+module StreamMonitor where
+
 import Control.Concurrent
 import Control.Monad
 
+import AuthCommand
 import ChannelJoiner
 import MtGoxStream
+import StreamCommand
 
-debugHookSetup _ = return $ debugHook
+debugHookSetup writer = do
+    forkIO $ do
+        threadDelay 3000000
+        nonce <- getNonce
+        writer (PrivateInfo { piNonce = nonce })
+    return debugHook
 
-debugHook msg = print msg
+debugHook = print
 
 main :: IO ()
 main = do

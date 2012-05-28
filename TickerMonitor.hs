@@ -47,7 +47,7 @@ getTickerStatus' store = do
       | age >= 60 && age <= 300 = FailedImmediately "Data stale"    -- will retry
       | otherwise = CompletedSuccessfully TickerUnavailable     -- give up
 
-tickerStreamMessageHookSetup :: MVar (Maybe TickerStatus) -> StreamWriter -> IO (Hook)
+tickerStreamMessageHookSetup :: MVar (Maybe TickerStatus) -> StreamWriter -> IO Hook
 tickerStreamMessageHookSetup tickerStore _ = return $ tickerStreamMessageHook tickerStore
 
 tickerStreamMessageHook :: MVar (Maybe TickerStatus) -> StreamMessage -> IO ()
