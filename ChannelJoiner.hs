@@ -16,5 +16,5 @@ channelJoinerHookSetup channels writer = return $ channelJoinerHook channels wri
 channelJoinerHook :: [T.Text] -> StreamWriter -> StreamMessage -> IO ()
 channelJoinerHook channels writer (Subscribed { sChannel = sChannel }) =
     when (sChannel `notElem` channels) $
-        writer (UnsubscribeCmd sChannel)
+        writer (StreamCommandNoReply $ UnsubscribeCmd sChannel)
 channelJoinerHook channels _ _ = return ()

@@ -51,7 +51,7 @@ instance FromJSON StreamMessage
         Nothing -> return OtherMessage
     parseJSON _ = mzero
 
-getOperation ::  M.Map T.Text Value -> Maybe (T.Text, Object)
+getOperation :: M.Map T.Text Value -> Maybe (T.Text, Object)
 getOperation o = do
     op' <- M.lookup "op" o >>= extractText
     case op' of
@@ -65,13 +65,10 @@ getOperation o = do
         _ -> fail "unknown operation"
 
 parseDepth depth = case extractDepthData depth of
-    Just (priceV, volumeV, depthType) -> do
-        priceS <- parseJSON priceV :: Parser String
-        volumeS <- parseJSON volumeV :: Parser String
-        return DepthUpdateUSD { duPrice = read priceS
-                              , duVolume = read volumeS
-                              , duType = depthType
-                              }
+    Just (price, volume, depthType) ->
+        DepthUpdateUSD <$> coerceFromString (parseJSON price)
+                       <*> coerceFromString (parseJSON volume)
+                       <*> pure depthType
     Nothing -> mzero
 
 extractDepthData o = do
@@ -87,15 +84,14 @@ convertTypeStr (String "bid") = Just Bid
 convertTypeStr _ = Nothing
 
 parseTicker ticker = case extractTickerData ticker of
-    Just (buyV, sellV, lastV) -> do
-        buyS <- parseJSON buyV :: Parser String
-        sellS <- parseJSON sellV :: Parser String
-        lastS <- parseJSON lastV :: Parser String
-        return TickerUpdateUSD { tuBid = read buyS
-                               , tuAsk = read sellS
-                               , tuLast = read lastS
-                               }
+    Just (buy, sell, last) ->
+        TickerUpdateUSD <$> coerceFromString (parseJSON buy)
+                        <*> coerceFromString (parseJSON sell)
+                        <*> coerceFromString (parseJSON last)
     Nothing -> mzero
+
+coerceFromString :: Parser String -> Parser Integer
+coerceFromString = fmap read
 
 extractTickerData :: (IsString k, Ord k) => M.Map k Value -> Maybe (Value, Value, Value)
 extractTickerData o = do

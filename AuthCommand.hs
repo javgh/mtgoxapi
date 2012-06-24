@@ -47,7 +47,7 @@ hardcodedAuthSecret = "A0seCE45EgkyUOliU3wokMuRwq/AbdpVMJ353kmDXtH0mWdy9QqsSKVkA
 
 data AuthCommand = AuthCommand { acCall :: T.Text
                                , acParameters :: [(T.Text, T.Text)]
-                               , acIsGeneric :: Bool
+                               , acSetBTCUSD :: Bool
                                }
                    deriving (Show)
 
@@ -60,18 +60,18 @@ getNonce = do
 prepareCallPayload :: ToJSON a => AuthCommand -> a -> Value
 prepareCallPayload (AuthCommand { acCall = acCall
                                , acParameters = acParameters
-                               , acIsGeneric = acIsGeneric
+                               , acSetBTCUSD = acSetBTCUSD
                                }) nonce =
     let alwaysPresent = [ "id" .= nonce
                         , "call" .= acCall
                         , "nonce" .= nonce
                         , "params" .= acParameters
                         ]
-        optionalAddon = if acIsGeneric
-                            then []
-                            else [ "item" .= ("BTC" :: T.Text)
+        optionalAddon = if acSetBTCUSD
+                            then [ "item" .= ("BTC" :: T.Text)
                                  , "currency" .= ("USD" :: T.Text)
                                  ]
+                            else []
     in object (alwaysPresent ++ optionalAddon)
 
 fromRight :: String -> Either t t1 -> t1
