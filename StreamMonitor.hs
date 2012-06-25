@@ -28,7 +28,7 @@ main = do
     (commandHookChan, commandHookSetup) <- initCommandHook
     --tid <- initMtGoxStream [debugHookSetup, channelJoinerHookSetup []]
     tid <- initMtGoxStream [commandHookSetup, channelJoinerHookSetup []]
-    threadDelay 1000000
-    cmdResult <- sendPrivateInfoCmd commandHookChan
+    threadDelay 5000000
+    cmdResult <- sendFullDepthCmd commandHookChan
     print cmdResult
     forever $ threadDelay 1000000

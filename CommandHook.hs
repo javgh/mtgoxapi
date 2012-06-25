@@ -1,12 +1,15 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns, OverloadedStrings #-}
 module CommandHook
-    ( initCommandHook
+    ( CommandHookChan
+    , initCommandHook
     , sendPrivateInfoCmd
+    , sendFullDepthCmd
     ) where
 
 import Control.Applicative
 import Control.Concurrent
 import Data.Aeson.Types
+import System.Timeout
 
 import qualified Data.Map as M
 
@@ -21,36 +24,32 @@ data CommandHookMsg = SendCommand { chmCommand :: StreamCommandWR
                                   }
                       | NewMessage { chmMessage :: StreamMessage }
 
--- TODO: how to have watchChannel wait until writer is ready?
+newtype CommandHookChan = CommandHookChan { chcChan :: Chan CommandHookMsg }
 
--- TODO: maybe wrap the channel in a newtype (do research) to
--- have cleaner exported functionality
-
--- TODO: add timeout, in case no reply is received
--- see System.Timeout
---
--- long TODO: replay cmds in case they haven't been executed,
--- but before doing that, double-check whether they were really
--- not executed
-
-initCommandHook :: IO (Chan CommandHookMsg, HookSetup)
+initCommandHook :: IO (CommandHookChan, HookSetup)
 initCommandHook = do
-    chan <- newChan :: IO (Chan CommandHookMsg)
+    isReadyChan <- newChan :: IO (Chan ())
+    cmdChan <- newChan :: IO (Chan CommandHookMsg)
     writerStore <- newMVar (Nothing :: Maybe StreamWriter)
-    _ <- forkIO $ watchChannel chan writerStore
-    return (chan, commandHookSetup chan writerStore)
+    _ <- forkIO $ watchChannel isReadyChan cmdChan writerStore
+    return (CommandHookChan cmdChan, commandHookSetup isReadyChan cmdChan writerStore)
 
-commandHookSetup chan writerStore writer = do
+commandHookSetup :: Chan ()-> Chan CommandHookMsg -> MVar (Maybe a)-> a -> IO (StreamMessage -> IO ())
+commandHookSetup isReadyChan cmdChan writerStore writer = do
     _ <- swapMVar writerStore (Just writer)
-    return $ commandHook chan
+    writeChan isReadyChan ()
+    return $ commandHook cmdChan
 
 commandHook :: Chan CommandHookMsg -> StreamMessage -> IO ()
-commandHook chan msg = writeChan chan $ NewMessage msg
+commandHook cmdChan msg = writeChan cmdChan $ NewMessage msg
 
-watchChannel chan writerStore = go M.empty
+watchChannel :: Chan () -> Chan CommandHookMsg -> MVar (Maybe (StreamCommand -> IO a))-> IO b
+watchChannel isReadyChan cmdChan writerStore = do
+    _ <- readChan isReadyChan
+    go M.empty
   where
-    go outstandingReplies = do
-        msg <- readChan chan
+    go !outstandingReplies = do
+        msg <- readChan cmdChan
         case msg of
             SendCommand { chmCommand = cmd, chmAnswerChannel = answerChan } -> do
                 nonce <- getNonce
@@ -67,12 +66,19 @@ watchChannel chan writerStore = go M.empty
                         Nothing -> go outstandingReplies
                 _ -> go outstandingReplies
 
-sendPrivateInfoCmd :: Chan CommandHookMsg -> IO PrivateInfoReply
-sendPrivateInfoCmd chan = do
+sendCmd :: Chan CommandHookMsg -> StreamCommandWR -> IO (Maybe Value)
+sendCmd cmdChan cmd = do
     answerChan <- newChan :: IO (Chan Value)
-    let cmd = PrivateInfo ""
-    writeChan chan $ SendCommand cmd answerChan
-    answer <- parsePrivateInfoReply <$> readChan answerChan
-    case answer of
-        Success answer' -> return answer'
-        Error _ -> undefined
+    writeChan cmdChan $ SendCommand cmd answerChan
+    timeout (30 * 10^6) $ readChan answerChan
+
+-- | Executes command and waits for reply with a timeout of 30 seconds.
+sendPrivateInfoCmd :: CommandHookChan -> IO (Maybe PrivateInfoReply)
+sendPrivateInfoCmd (CommandHookChan cmdChan) = do
+    answer <- sendCmd cmdChan $ PrivateInfo ""
+    return $ answer >>= parsePrivateInfoReply
+
+sendFullDepthCmd :: CommandHookChan -> IO (Maybe FullDepthReply)
+sendFullDepthCmd (CommandHookChan cmdChan) = do
+    answer <- sendCmd cmdChan $ FullDepth ""
+    return $ answer >>= parseFullDepthReply

@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module AuthCommandReplyParsing
     ( PrivateInfoReply (..)
+    , FullDepthReply (..)
     , parsePrivateInfoReply
     , parseFullDepthReply
     ) where
@@ -96,8 +97,12 @@ instance FromJSON FullDepthReply
 coerceFromString :: Parser String -> Parser Integer
 coerceFromString = fmap read
 
-parsePrivateInfoReply :: Value -> Result PrivateInfoReply
-parsePrivateInfoReply = fromJSON
+parsePrivateInfoReply :: Value -> Maybe PrivateInfoReply
+parsePrivateInfoReply v = case fromJSON v of
+                            Success p -> Just p
+                            Error _ -> Nothing
 
-parseFullDepthReply :: Value -> Result FullDepthReply
-parseFullDepthReply = fromJSON
+parseFullDepthReply :: Value -> Maybe FullDepthReply
+parseFullDepthReply v = case fromJSON v of
+                            Success p -> Just p
+                            Error _ -> Nothing
