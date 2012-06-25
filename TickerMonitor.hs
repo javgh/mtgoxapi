@@ -61,7 +61,7 @@ tickerStreamMessageHook tickerStore (update@TickerUpdateUSD {}) = do
                                     }
     _ <- swapMVar tickerStore (Just tickerStatus)
     return ()
-tickerStreamMessageHook tickerStore _ = return ()
+tickerStreamMessageHook _ _ = return ()
 
 
 -- | Will start a thread that monitors Mt.Gox's ticker

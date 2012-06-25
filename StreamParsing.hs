@@ -2,6 +2,7 @@
 module StreamParsing
     ( parseStreamLine
     , StreamMessage(..)
+    , DepthType(..)
     ) where
 
 import Control.Applicative

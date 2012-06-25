@@ -2,6 +2,7 @@
 module AuthCommandReplyParsing
     ( PrivateInfoReply (..)
     , FullDepthReply (..)
+    , DepthEntry (..)
     , parsePrivateInfoReply
     , parseFullDepthReply
     ) where
@@ -27,12 +28,12 @@ data DepthEntry = DepthEntry { deAmount :: Integer
                              , dePrice :: Integer
                              , deStamp :: T.Text
                              }
-                  deriving (Show)
+                  deriving (Show, Read)
 
 data FullDepthReply = FullDepthReply { fdrAsks :: [DepthEntry]
                                      , fdrBids :: [DepthEntry]
                                      }
-                      deriving (Show)
+                      deriving (Show, Read)
 
 instance FromJSON PrivateInfoReply
   where

@@ -8,6 +8,8 @@ import AuthCommand
 import AuthCommandReplyParsing
 import ChannelJoiner
 import CommandHook
+import DepthStore
+import DepthStoreAdapter
 import MtGoxStream
 import StreamCommand
 import StreamParsing
@@ -26,9 +28,16 @@ import StreamParsing
 main :: IO ()
 main = do
     (commandHookChan, commandHookSetup) <- initCommandHook
+    (depthStoreChan, depthStoreHookSetup) <- initDepthStoreAdapter commandHookChan
     --tid <- initMtGoxStream [debugHookSetup, channelJoinerHookSetup []]
-    tid <- initMtGoxStream [commandHookSetup, channelJoinerHookSetup []]
-    threadDelay 5000000
-    cmdResult <- sendFullDepthCmd commandHookChan
-    print cmdResult
-    forever $ threadDelay 1000000
+    tid <- initMtGoxStream [ commandHookSetup
+                           , channelJoinerHookSetup [mtGoxDepthChannel]
+                           , depthStoreHookSetup
+                           ]
+    threadDelay 8000000
+    forever $ do
+        p1 <- simulateBTCSell depthStoreChan (10 * 10^8)
+        p2 <- simulateBTCBuy depthStoreChan (10 * 10^8)
+        putStrLn $ "Sell 10 BTC: " ++ show p1 ++ "\t\tBuy 10 BTC: " ++ show p2
+        when (p1 > p2) $ error "Inconsistency! Selling makes more money than buying costs" threadDelay 1000000
+        threadDelay 1000000
