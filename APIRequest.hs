@@ -56,7 +56,7 @@ instance FromJSON MtGoxOrders
 instance FromJSON MtGoxOrderQueued
   where
     parseJSON (Object o) = case M.lookup "status" o of
-        Just (statusV) -> do
+        Just statusV -> do
             status <- parseJSON statusV :: Parser String
             if "queued" `isInfixOf` status
                 then return MtGoxOrderQueued
@@ -228,3 +228,4 @@ main = do
     ----placeOrder "buy" "0.01" >>= print
     --_ <- letOrdersExecute
     --getFunds >>= print
+    return ()

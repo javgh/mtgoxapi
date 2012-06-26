@@ -64,7 +64,7 @@ delayedInit commandHookChan depthStoreChan = do
     putStrLn "starting delayed init of depth store"
     depthM <- sendFullDepthCmd commandHookChan
     case depthM of
-        Just (depth) -> do
+        Just depth -> do
             mapM_ (updateCmd DepthStoreAsk) (fdrAsks depth)
             mapM_ (updateCmd DepthStoreBid) (fdrBids depth)
         Nothing -> return ()

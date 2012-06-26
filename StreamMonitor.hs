@@ -36,8 +36,8 @@ main = do
                            ]
     threadDelay 8000000
     forever $ do
-        p1 <- simulateBTCSell depthStoreChan (10 * 10^8)
-        p2 <- simulateBTCBuy depthStoreChan (10 * 10^8)
-        putStrLn $ "Sell 10 BTC: " ++ show p1 ++ "\t\tBuy 10 BTC: " ++ show p2
-        when (p1 > p2) $ error "Inconsistency! Selling makes more money than buying costs" threadDelay 1000000
+        --p1 <- simulateBTCSell depthStoreChan (10 * 10^8)
+        --p2 <- simulateBTCBuy depthStoreChan (10 * 10^8)
+        --putStrLn $ "Sell 10 BTC: " ++ show p1 ++ "\t\tBuy 10 BTC: " ++ show p2
+        --when (p1 > p2) $ error "Inconsistency! Selling makes more money than buying costs" threadDelay 1000000
         threadDelay 1000000
