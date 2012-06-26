@@ -4,6 +4,7 @@ module StreamCommand
     , StreamCommand (..)
     , StreamCommandNR (..)
     , StreamCommandWR (..)
+    , StreamCommandOrderType (..)
     , StreamWriter
     ) where
 
@@ -20,13 +21,26 @@ data StreamCommand = StreamCommandNoReply { scnrCmd :: StreamCommandNR }
                    deriving (Show)
 
 data StreamCommandNR = UnsubscribeCmd { scChannel :: T.Text }
+                       | PrivateSubscribeCmd { scKey :: T.Text }
                        deriving (Show)
 
 data StreamCommandWR = PrivateInfo { scNonce :: T.Text }
                      | USDCurrencyInfo { scNonce :: T.Text }
                      | IDKey { scNonce :: T.Text }
                      | FullDepth { scNonce :: T.Text }
+                     | Order { scNonce :: T.Text
+                             , scOrderType :: StreamCommandOrderType
+                             , scAmount :: Integer
+                             }
+                     | OpenOrderCount { scNonce :: T.Text }
+                     | WithdrawBTC { scNonce :: T.Text
+                                   , scAddress :: T.Text
+                                   , scAmount :: Integer
+                                   }
                      deriving (Show)
+
+data StreamCommandOrderType = OrderTypeBuyBTC | OrderTypeSellBTC
+                              deriving (Show)
 
 type StreamWriter = StreamCommand -> IO ()
 
@@ -40,6 +54,10 @@ instance ToJSON StreamCommandNR
     toJSON cmd@UnsubscribeCmd {} =
         object [ "op" .= ("unsubscribe" :: T.Text)
                , "channel" .= scChannel cmd
+               ]
+    toJSON cmd@PrivateSubscribeCmd {} =
+        object [ "op" .= ("mtgox.subscribe" :: T.Text)
+               , "key" .= scKey cmd
                ]
 
 instance ToJSON StreamCommandWR
@@ -68,6 +86,33 @@ instance ToJSON StreamCommandWR
                                        , acSetBTCUSD = True
                                        }
         in prepareAuthCommand fullDepthCmd (scNonce cmd)
+    toJSON cmd@Order {} =
+        let params = [ ("type", case scOrderType cmd of
+                                    OrderTypeBuyBTC -> "bid"
+                                    OrderTypeSellBTC -> "ask")
+                     , ("amount_int", T.pack . show $ scAmount cmd)
+                     , ("prefer_fiat_fee", "1")
+                     ]
+            orderCmd = AuthCommand { acCall = "private/order/add"
+                                   , acParameters = params
+                                   , acSetBTCUSD = True
+                                   }
+        in prepareAuthCommand orderCmd (scNonce cmd)
+    toJSON cmd@OpenOrderCount {} =
+        let openOrderCountCmd = AuthCommand { acCall = "private/orders"
+                                            , acParameters = []
+                                            , acSetBTCUSD = False
+                                            }
+        in prepareAuthCommand openOrderCountCmd (scNonce cmd)
+    toJSON cmd@WithdrawBTC {} =
+        let params = [ ("btca", scAddress cmd)
+                     , ("amount", T.pack . show $ scAmount cmd)
+                     ]
+            withdrawBTCCmd = AuthCommand { acCall = "private/withdraw"
+                                         , acParameters = params
+                                         , acSetBTCUSD = False
+                                         }
+        in prepareAuthCommand withdrawBTCCmd (scNonce cmd)
 
 encodeStreamCommand :: StreamCommand -> L.ByteString
 encodeStreamCommand = encode

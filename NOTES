@@ -32,6 +32,8 @@ API-Calls: Submit an order
 
   prefer_fiat_fee=1
 
+  String "d8972c33-3c1f-4eda-139a-fe4e60d7bba7"
+
 API-Calls: Order result
 
 Just
@@ -63,6 +65,29 @@ Just
 API-Calls: Wallet history - gefiltert auf eine Trade-ID
 
 Private per-account messages: Updates to the user's wallet balance.
+  Subscribed {sChannel = "c6399520-329c-4742-8479-06625acb8fc6"}
+
+  1 BTC gekauft:
+    WalletOperation {woType = BTCIn, woAmount = 1000000}
+    WalletOperation {woType = USDSpent, woAmount = 6368}
+    WalletOperation {woType = USDFee, woAmount = 38}
+
+    WalletOperation {woType = BTCIn, woAmount = 15803620}
+    WalletOperation {woType = USDSpent, woAmount = 101143}
+    WalletOperation {woType = USDFee, woAmount = 607}
+
+    WalletOperation {woType = BTCIn, woAmount = 83196380}
+    WalletOperation {woType = USDSpent, woAmount = 533197}
+    WalletOperation {woType = USDFee, woAmount = 3199}
+
+  Strategie: warten bis OpenOrderCount auf 0 zurückgegangen ist und in
+    der Zwischenzeit alle WalletOperation-Nachrichten zusammenaddieren
+
+Feedback an Tux:
+  Problem der sicheren Übertragung von Kommandos
+  Umständlichkeit mit Socket.IO
+  schwierig herauszufinden, wann eine "Order" komplett ausgeführt wurde
+  kein Withdraw-Kommando für API version 1
 
 Just
   "{\"result\":\"success\",

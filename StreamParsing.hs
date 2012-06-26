@@ -21,6 +21,15 @@ import qualified System.IO as IO
 data DepthType = Ask | Bid
                  deriving (Show)
 
+data WalletOperationType = BTCDeposit
+                         | BTCWithdraw
+                         | USDEarned
+                         | USDSpent
+                         | BTCIn
+                         | BTCOut
+                         | USDFee
+                         deriving (Show)
+
 data StreamMessage = TickerUpdateUSD { tuBid :: Integer
                                      , tuAsk :: Integer
                                      , tuLast :: Integer
@@ -29,6 +38,9 @@ data StreamMessage = TickerUpdateUSD { tuBid :: Integer
                                       , duVolume :: Integer
                                       , duType :: DepthType
                                       }
+                     | WalletOperation { woType :: WalletOperationType
+                                       , woAmount :: Integer
+                                       }
                      | Subscribed { sChannel :: T.Text }
                      | Unsubscribed { usChannel :: T.Text }
                      | CallResult { crID :: T.Text
@@ -48,6 +60,7 @@ instance FromJSON StreamMessage
             CallResult <$> result .: "id" <*> result .: "result"
         Just ("ticker", ticker) -> parseTicker ticker
         Just ("depth", depth) -> parseDepth depth
+        Just ("wallet", wallet) -> parseWallet wallet
         Just _ -> return OtherMessage
         Nothing -> return OtherMessage
     parseJSON _ = mzero
@@ -65,6 +78,30 @@ getOperation o = do
         "result" -> return (op', o)
         _ -> fail "unknown operation"
 
+parseWallet :: Object -> Parser StreamMessage
+parseWallet wallet = do
+    op <- wallet .: "op" :: Parser String
+    case op of
+        "deposit" -> go BTCDeposit "BTC"
+        "withdraw" -> go BTCWithdraw "BTC"
+        "earned" -> go USDEarned "USD"
+        "spent" -> go USDSpent "USD"
+        "in" -> go BTCIn "BTC"
+        "out" -> go BTCOut "BTC"
+        "fee" -> go USDFee "USD"
+        _ -> return OtherMessage
+  where
+    go checkedOp expectedCurrency = do
+        amountDetails <- wallet .: "amount"
+        amount <- coerceFromString $ amountDetails .: "value_int"
+        currency <- amountDetails .: "currency" :: Parser String
+        if currency == expectedCurrency
+            then return $ WalletOperation { woType = checkedOp
+                                          , woAmount = amount
+                                          }
+            else mzero
+
+parseDepth :: (IsString k, Ord k) => M.Map k Value -> Parser StreamMessage
 parseDepth depth = case extractDepthData depth of
     Just (price, volume, depthType) ->
         DepthUpdateUSD <$> coerceFromString (parseJSON price)
@@ -72,6 +109,7 @@ parseDepth depth = case extractDepthData depth of
                        <*> pure depthType
     Nothing -> mzero
 
+extractDepthData :: (IsString k, Ord k) => M.Map k Value -> Maybe (Value, Value, DepthType)
 extractDepthData o = do
     currency <- M.lookup "currency" o
     guard (currency == expectedCurrency)
@@ -80,10 +118,12 @@ extractDepthData o = do
     depthType <- M.lookup "type_str" o >>= convertTypeStr
     return (price, volume, depthType)
 
+convertTypeStr :: Value -> Maybe DepthType
 convertTypeStr (String "ask") = Just Ask
 convertTypeStr (String "bid") = Just Bid
 convertTypeStr _ = Nothing
 
+parseTicker :: (IsString k, Ord k) => M.Map k Value -> Parser StreamMessage
 parseTicker ticker = case extractTickerData ticker of
     Just (buy, sell, last) ->
         TickerUpdateUSD <$> coerceFromString (parseJSON buy)

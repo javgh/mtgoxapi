@@ -3,8 +3,14 @@ module AuthCommandReplyParsing
     ( PrivateInfoReply (..)
     , FullDepthReply (..)
     , DepthEntry (..)
+    , OrderReply (..)
+    , IDKeyReply (..)
+    , OpenOrderCountReply (..)
     , parsePrivateInfoReply
     , parseFullDepthReply
+    , parseOrderReply
+    , parseIDKeyReply
+    , parseOpenOrderCountReply
     ) where
 
 import Control.Applicative
@@ -16,6 +22,7 @@ import Data.String
 import qualified Data.Attoparsec as AP
 import qualified Data.Map as M
 import qualified Data.Text as T
+import qualified Data.Vector as V
 
 data PrivateInfoReply = PrivateInfoReply { pirBtcBalance :: Integer
                                          , pirUsdBalance :: Integer
@@ -23,6 +30,9 @@ data PrivateInfoReply = PrivateInfoReply { pirBtcBalance :: Integer
                                          , pirUsdOperations :: Integer
                                          }
                         deriving (Show)
+
+data IDKeyReply = IDKeyReply { idkrKey :: T.Text }
+                  deriving (Show)
 
 data DepthEntry = DepthEntry { deAmount :: Integer
                              , dePrice :: Integer
@@ -34,6 +44,12 @@ data FullDepthReply = FullDepthReply { fdrAsks :: [DepthEntry]
                                      , fdrBids :: [DepthEntry]
                                      }
                       deriving (Show, Read)
+
+data OrderReply = OrderReply { orGUID :: T.Text }
+                  deriving (Show)
+
+data OpenOrderCountReply = OpenOrderCountReply { oocrCount :: Integer }
+                           deriving (Show)
 
 instance FromJSON PrivateInfoReply
   where
@@ -95,6 +111,22 @@ instance FromJSON FullDepthReply
         FullDepthReply <$> o .: "asks"
                        <*> o .: "bids"
 
+instance FromJSON OrderReply
+  where
+    parseJSON (String guid) = return $ OrderReply guid
+    parseJSON _ = mzero
+
+instance FromJSON IDKeyReply
+  where
+    parseJSON (String key) = return $ IDKeyReply key
+    parseJSON _ = mzero
+
+instance FromJSON OpenOrderCountReply
+  where
+    parseJSON (Array orders) =
+        return $ OpenOrderCountReply (fromIntegral . V.length $ orders)
+    parseJSON _ = mzero
+
 coerceFromString :: Parser String -> Parser Integer
 coerceFromString = fmap read
 
@@ -107,3 +139,18 @@ parseFullDepthReply :: Value -> Maybe FullDepthReply
 parseFullDepthReply v = case fromJSON v of
                             Success p -> Just p
                             Error _ -> Nothing
+
+parseOrderReply :: Value -> Maybe OrderReply
+parseOrderReply v = case fromJSON v of
+                        Success p -> Just p
+                        Error _ -> Nothing
+
+parseIDKeyReply :: Value -> Maybe IDKeyReply
+parseIDKeyReply v = case fromJSON v of
+                        Success p -> Just p
+                        Error _ -> Nothing
+
+parseOpenOrderCountReply :: Value -> Maybe OpenOrderCountReply
+parseOpenOrderCountReply v = case fromJSON v of
+                                Success p -> Just p
+                                Error _ -> Nothing

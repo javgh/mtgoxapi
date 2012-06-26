@@ -4,6 +4,9 @@ module CommandHook
     , initCommandHook
     , sendPrivateInfoCmd
     , sendFullDepthCmd
+    , sendOrderCmd
+    , sendIDKeyCmd
+    , sendOpenOrderCountCmd
     ) where
 
 import Control.Applicative
@@ -82,3 +85,18 @@ sendFullDepthCmd :: CommandHookChan -> IO (Maybe FullDepthReply)
 sendFullDepthCmd (CommandHookChan cmdChan) = do
     answer <- sendCmd cmdChan $ FullDepth ""
     return $ answer >>= parseFullDepthReply
+
+sendOrderCmd :: CommandHookChan -> StreamCommandOrderType-> Integer-> IO (Maybe OrderReply)
+sendOrderCmd (CommandHookChan cmdChan) orderType amount = do
+    answer <- sendCmd cmdChan $ Order "" orderType amount
+    return $ answer >>= parseOrderReply
+
+sendIDKeyCmd :: CommandHookChan -> IO (Maybe IDKeyReply)
+sendIDKeyCmd (CommandHookChan cmdChan) = do
+    answer <- sendCmd cmdChan $ IDKey ""
+    return $ answer >>= parseIDKeyReply
+
+sendOpenOrderCountCmd :: CommandHookChan -> IO (Maybe OpenOrderCountReply)
+sendOpenOrderCountCmd (CommandHookChan cmdChan) = do
+    answer <- sendCmd cmdChan $ OpenOrderCount ""
+    return $ answer >>= parseOpenOrderCountReply

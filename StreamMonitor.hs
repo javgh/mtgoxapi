@@ -14,30 +14,46 @@ import MtGoxStream
 import StreamCommand
 import StreamParsing
 
---debugHookSetup writer = do
---    forkIO $ do
---        threadDelay 5000000
---        nonce <- getNonce
---        writer FullDepth { scNonce = nonce }
---    return debugHook
---
+debugHookSetup writer = do
+    forkIO $ do
+        threadDelay 8000000
+        nonce <- getNonce
+        --let order = Order { scNonce = nonce
+        --                  , scOrderType = OrderTypeSellBTC
+        --                  , scAmount = round (0.01 * 10^8)
+        --                  }
+        --let key = "xjmVIDKcR0KEeQZiWsuPxgAAAABP6wV/QO6Iarjpdcrr54/KczeymoJEJft2iE1SU4VKnPCXHkQ"
+        --writer $ StreamCommandNoReply (PrivateSubscribeCmd key)
+        let withdraw = WithdrawBTC { scNonce = nonce
+                                   , scAddress = "1BidUjjWMQMk69XiKE5J3YUZaJmx23EfPW"
+                                   , scAmount = round (0.01 * 10^8)
+                                   }
+        writer $ StreamCommandWithReply withdraw
+    return debugHook
+
 --debugHook (CallResult { crResult = crResult }) = print $ parseFullDepthReply crResult
-----debugHook (CallResult { crResult = crResult }) = print crResult
---debugHook msg = print msg
+debugHook (CallResult { crResult = crResult }) = print crResult
+debugHook msg = print msg
 
 main :: IO ()
 main = do
-    (commandHookChan, commandHookSetup) <- initCommandHook
-    (depthStoreChan, depthStoreHookSetup) <- initDepthStoreAdapter commandHookChan
-    --tid <- initMtGoxStream [debugHookSetup, channelJoinerHookSetup []]
-    tid <- initMtGoxStream [ commandHookSetup
-                           , channelJoinerHookSetup [mtGoxDepthChannel]
-                           , depthStoreHookSetup
-                           ]
-    threadDelay 8000000
-    forever $ do
-        --p1 <- simulateBTCSell depthStoreChan (10 * 10^8)
-        --p2 <- simulateBTCBuy depthStoreChan (10 * 10^8)
-        --putStrLn $ "Sell 10 BTC: " ++ show p1 ++ "\t\tBuy 10 BTC: " ++ show p2
-        --when (p1 > p2) $ error "Inconsistency! Selling makes more money than buying costs" threadDelay 1000000
-        threadDelay 1000000
+    tid <- initMtGoxStream [debugHookSetup, channelJoinerHookSetup ["c6399520-329c-4742-8479-06625acb8fc6"]]
+    --(commandHookChan, commandHookSetup) <- initCommandHook
+    --tid <- initMtGoxStream [ commandHookSetup , channelJoinerHookSetup []]
+
+--    forever $ do
+--        line <- getLine
+--        case line of
+--            "b" -> do
+--                reply <- sendOrderCmd commandHookChan OrderTypeBuyBTC (round (0.01 * 10^8))
+--                print reply
+--            "s" -> do
+--                reply <- sendOrderCmd commandHookChan OrderTypeSellBTC (round (0.01 * 10^8))
+--                print reply
+--            _ -> return ()
+
+--    threadDelay 8000000
+--
+--    sendOpenOrderCountCmd commandHookChan >>= print
+
+    forever $ threadDelay 1000000

@@ -65,7 +65,7 @@ prepareCallPayload (AuthCommand { acCall = acCall
     let alwaysPresent = [ "id" .= nonce
                         , "call" .= acCall
                         , "nonce" .= nonce
-                        , "params" .= acParameters
+                        , "params" .= toMap acParameters
                         ]
         optionalAddon = if acSetBTCUSD
                             then [ "item" .= ("BTC" :: T.Text)
@@ -73,6 +73,9 @@ prepareCallPayload (AuthCommand { acCall = acCall
                                  ]
                             else []
     in object (alwaysPresent ++ optionalAddon)
+  where
+    toMap :: ToJSON b => [(T.Text, b)] -> Value
+    toMap = object . map (uncurry (.=))
 
 fromRight :: String -> Either t t1 -> t1
 fromRight msg (Left _) = error msg
