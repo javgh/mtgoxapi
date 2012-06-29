@@ -5,9 +5,11 @@ module DepthStore
     , initDepthStore
     , simulateBTCSell
     , simulateBTCBuy
+    , simulateUSDSell
     , updateDepthStore
 #if !PRODUCTION
-    , simulate
+    , simulateBTC
+    , simulateUSD
     , DepthStoreEntry (..)
 #endif
     ) where
@@ -48,6 +50,9 @@ data DepthStoreMsg = UpdateDepthStore { dsmType :: DepthStoreType
                      | SimulateBTCBuy { dsmAmount :: Integer
                                       , dsmAnswerChan :: Chan (Maybe Integer)
                                       }
+                     | SimulateUSDSell { dsmAmount :: Integer
+                                       , dsmAnswerChan :: Chan (Maybe Integer)
+                                       }
 
 newtype DepthStoreChan = DepthStoreChan { dscChan :: Chan DepthStoreMsg }
 
@@ -80,29 +85,51 @@ processMsg UpdateDepthStore { dsmType = t
 processMsg SimulateBTCSell { dsmAmount = amount
                            , dsmAnswerChan = answerChan } askStore bidStore = do
     let bids = I.toDescList (I.Proxy :: I.Proxy Integer) bidStore
-        answer = simulate amount bids
+        answer = simulateBTC amount bids
     writeChan answerChan answer
     return (askStore, bidStore)
 processMsg SimulateBTCBuy { dsmAmount = amount
                           , dsmAnswerChan = answerChan } askStore bidStore = do
     let asks = I.toAscList (I.Proxy :: I.Proxy Integer) askStore
-        answer = simulate amount asks
+        answer = simulateBTC amount asks
+    writeChan answerChan answer
+    return (askStore, bidStore)
+processMsg SimulateUSDSell { dsmAmount = usdAmount
+                           , dsmAnswerChan = answerChan } askStore bidStore = do
+    let asks = I.toAscList (I.Proxy :: I.Proxy Integer) askStore
+        answer = simulateUSD usdAmount asks
     writeChan answerChan answer
     return (askStore, bidStore)
 
-simulate :: Integer -> [DepthStoreEntry] -> Maybe Integer
-simulate 0 _ = Just 0
-simulate _ [] = Nothing
-simulate remainingAmount ((dse@DepthStoreEntry {}):entries) =
+simulateBTC :: Integer -> [DepthStoreEntry] -> Maybe Integer
+simulateBTC 0 _ = Just 0
+simulateBTC _ [] = Nothing
+simulateBTC remainingAmount ((dse@DepthStoreEntry {}):entries) =
     let amount = dseAmount dse
         price = dsePrice dse
     in if remainingAmount <= amount
             then Just (adjustZeros (remainingAmount * price))
             else let x = adjustZeros (amount * price)
-                     y = simulate (remainingAmount - amount) entries
+                     y = simulateBTC (remainingAmount - amount) entries
                  in (+) x <$> y
   where
     adjustZeros = round . (/ 10 ^ 8) . fromIntegral
+
+simulateUSD :: Integer -> [DepthStoreEntry] -> Maybe Integer
+simulateUSD 0 _ = Just 0
+simulateUSD _ [] = Nothing
+simulateUSD remainingUsdAmount ((dse@DepthStoreEntry {}):entries) =
+    let amount = dseAmount dse
+        price = dsePrice dse
+        totalCost = adjustZeros(amount * price)
+    in if remainingUsdAmount <= totalCost
+            then Just (adjustedDevide remainingUsdAmount price)
+            else let x = amount
+                     y = simulateUSD (remainingUsdAmount - totalCost) entries
+                 in (+) x <$> y
+  where
+    adjustZeros = round . (/ 10 ^ 8) . fromIntegral
+    adjustedDevide a b = round . (/ fromIntegral b) . fromIntegral . (* 10 ^ 8) $ a
 
 updateStore !store amount price timestamp =
     let entry = DepthStoreEntry { dseAmount = amount
@@ -130,6 +157,12 @@ simulateBTCBuy :: DepthStoreChan -> Integer -> IO (Maybe Integer)
 simulateBTCBuy (DepthStoreChan cmdChan) amount = do
     answerChan <- newChan :: IO (Chan (Maybe Integer))
     writeChan cmdChan $ SimulateBTCBuy amount answerChan
+    readChan answerChan
+
+simulateUSDSell :: DepthStoreChan -> Integer -> IO (Maybe Integer)
+simulateUSDSell (DepthStoreChan cmdChan) usdAmount = do
+    answerChan <- newChan :: IO (Chan (Maybe Integer))
+    writeChan cmdChan $ SimulateUSDSell usdAmount answerChan
     readChan answerChan
 
 updateDepthStore :: DepthStoreChan -> DepthStoreType -> Integer -> Integer -> IO ()

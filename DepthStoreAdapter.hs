@@ -69,12 +69,6 @@ delayedInit commandHookChan depthStoreChan = do
             mapM_ (updateCmd DepthStoreBid) (fdrBids depth)
         Nothing -> return ()
     putStrLn "depth store initialized"
-    price1 <- simulateBTCSell depthStoreChan (10 * 10^8)
-    price2 <- simulateBTCBuy depthStoreChan (10 * 10^8)
-    putStrLn "simulateBTCSell of 10 BTC:"
-    print price1
-    putStrLn "simulateBTCBuy of 10 BTC:"
-    print price2
   where
     updateCmd t (DepthEntry { deAmount = amount, dePrice = price }) =
         updateDepthStore depthStoreChan t amount price
