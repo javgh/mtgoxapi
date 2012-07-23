@@ -56,7 +56,7 @@ writer h cmd = do
     return ()   -- ignore any exceptions; they should hopefully soon
                 -- be caught on socketLoop's thread as well
   where
-    go = BL.hPutStr h (encodeStreamCommand cmd) >> BL.hPutStr h "\n"
+    go = BL.hPutStr h (encodeStreamCommand cmd) >> B.hPutStr h "\n"
 
 -- | Starts a thread that will connect to the data stream
 -- from Mt. Gox and call the supplied hook setups once with a writer
@@ -64,7 +64,6 @@ writer h cmd = do
 -- which will then be called for every parsed message.
 -- A watchdog maintains the connection.
 initMtGoxStream :: [HookSetup] -> IO ThreadId
-initMtGoxStream hookSetups = do
-    let watchdogConf = defaultWatchdogConfig
-        task = socketLoop hookSetups
-    forkIO $ watchdog watchdogConf (timeTask task)
+initMtGoxStream hookSetups =
+    let task = socketLoop hookSetups
+    in forkIO $ watchdog (watch task)

@@ -9,12 +9,13 @@ import Control.Applicative
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.Types
+import Data.Hashable
 import Data.String
 import Network
 
 import qualified Data.Attoparsec as AP
 import qualified Data.ByteString as B
-import qualified Data.Map as M
+import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified System.IO as IO
 
@@ -65,13 +66,13 @@ instance FromJSON StreamMessage
         Nothing -> return OtherMessage
     parseJSON _ = mzero
 
-getOperation :: M.Map T.Text Value -> Maybe (T.Text, Object)
+getOperation :: H.HashMap T.Text Value -> Maybe (T.Text, Object)
 getOperation o = do
-    op' <- M.lookup "op" o >>= extractText
+    op' <- H.lookup "op" o >>= extractText
     case op' of
         "private" -> do
-            op <- M.lookup "private" o >>= extractText
-            payload <- M.lookup op o >>= extractObject
+            op <- H.lookup "private" o >>= extractText
+            payload <- H.lookup op o >>= extractObject
             return (op, payload)
         "subscribe" -> return (op', o)
         "unsubscribe" -> return (op', o)
@@ -101,7 +102,7 @@ parseWallet wallet = do
                                           }
             else mzero
 
-parseDepth :: (IsString k, Ord k) => M.Map k Value -> Parser StreamMessage
+parseDepth :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Parser StreamMessage
 parseDepth depth = case extractDepthData depth of
     Just (price, volume, depthType) ->
         DepthUpdateUSD <$> coerceFromString (parseJSON price)
@@ -109,13 +110,13 @@ parseDepth depth = case extractDepthData depth of
                        <*> pure depthType
     Nothing -> mzero
 
-extractDepthData :: (IsString k, Ord k) => M.Map k Value -> Maybe (Value, Value, DepthType)
+extractDepthData :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Maybe (Value, Value, DepthType)
 extractDepthData o = do
-    currency <- M.lookup "currency" o
+    currency <- H.lookup "currency" o
     guard (currency == expectedCurrency)
-    price <- M.lookup "price_int" o
-    volume <- M.lookup "total_volume_int" o
-    depthType <- M.lookup "type_str" o >>= convertTypeStr
+    price <- H.lookup "price_int" o
+    volume <- H.lookup "total_volume_int" o
+    depthType <- H.lookup "type_str" o >>= convertTypeStr
     return (price, volume, depthType)
 
 convertTypeStr :: Value -> Maybe DepthType
@@ -123,7 +124,7 @@ convertTypeStr (String "ask") = Just Ask
 convertTypeStr (String "bid") = Just Bid
 convertTypeStr _ = Nothing
 
-parseTicker :: (IsString k, Ord k) => M.Map k Value -> Parser StreamMessage
+parseTicker :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Parser StreamMessage
 parseTicker ticker = case extractTickerData ticker of
     Just (buy, sell, last) ->
         TickerUpdateUSD <$> coerceFromString (parseJSON buy)
@@ -134,20 +135,20 @@ parseTicker ticker = case extractTickerData ticker of
 coerceFromString :: Parser String -> Parser Integer
 coerceFromString = fmap read
 
-extractTickerData :: (IsString k, Ord k) => M.Map k Value -> Maybe (Value, Value, Value)
+extractTickerData :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Maybe (Value, Value, Value)
 extractTickerData o = do
     buyPrice <- lookupInTicker "buy" o
     sellPrice <- lookupInTicker "sell" o
     lastPrice <- lookupInTicker "last" o
     return (buyPrice, sellPrice, lastPrice)
 
-lookupInTicker ::  Ord k => k -> M.Map k Value -> Maybe Value
+lookupInTicker :: (Eq k, Hashable k) => k -> H.HashMap k Value -> Maybe Value
 lookupInTicker field o = do
-        tickerField <- M.lookup field o
+        tickerField <- H.lookup field o
                         >>= extractObject
-        currency <- M.lookup "currency" tickerField
+        currency <- H.lookup "currency" tickerField
         guard (currency == expectedCurrency)
-        M.lookup "value_int" tickerField
+        H.lookup "value_int" tickerField
 
 extractObject :: Value -> Maybe Object
 extractObject (Object o) = Just o

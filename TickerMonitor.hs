@@ -26,26 +26,27 @@ expectedPrecision = 5
 
 getTickerStatus :: MVar (Maybe TickerStatus) -> IO TickerStatus
 getTickerStatus store =
-    let watchdogConf = customWatchdogConfig 200000 {- 200 ms -}
-                                            200000000 {- 20 seconds -}
-                                            (\_ _ -> return ()) {- no logging -}
-        task = getTickerStatus' store
-    in watchdog watchdogConf task
+    let task = getTickerStatus' store
+    in watchdog $ do
+        setInitialDelay 200000 {- 200 ms -}
+        setMaximumDelay 200000000 {- 20 seconds -}
+        setLoggingAction silentLogger
+        watch task
 
-getTickerStatus' :: MVar (Maybe TickerStatus) -> IO (WatchdogTaskStatus TickerStatus)
+getTickerStatus' :: MVar (Maybe TickerStatus) -> IO (Either String TickerStatus)
 getTickerStatus' store = do
     tickerStatusM <- readMVar store
     case tickerStatusM of
-        Nothing -> return $ FailedImmediately "No ticker data present"
+        Nothing -> return $ Left "No ticker data present"
         Just tickerStatus -> do
             now <- getCurrentTime
             let age = diffUTCTime now (tsTimestamp tickerStatus)
             return $ decideOnAge age tickerStatus
   where
     decideOnAge age tickerStatus
-      | age < 60 = CompletedSuccessfully tickerStatus
-      | age >= 60 && age <= 300 = FailedImmediately "Data stale"    -- will retry
-      | otherwise = CompletedSuccessfully TickerUnavailable     -- give up
+      | age < 60 = Right tickerStatus
+      | age >= 60 && age <= 300 = Left "Data stale"    -- will retry
+      | otherwise = Right TickerUnavailable            -- give up
 
 tickerStreamMessageHookSetup :: MVar (Maybe TickerStatus) -> StreamWriter -> IO Hook
 tickerStreamMessageHookSetup tickerStore _ = return $ tickerStreamMessageHook tickerStore

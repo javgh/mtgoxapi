@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 import Control.Applicative
 import Control.Monad
 import Control.Watchdog
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Digest.Pure.SHA
+import Data.Hashable
 import Data.List
 import Data.Maybe
 import Data.String
@@ -17,7 +19,7 @@ import qualified Codec.Binary.Base64 as Base64
 import qualified Data.Attoparsec as AP
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Lazy.Char8 as BL8
-import qualified Data.Map as M
+import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
@@ -46,7 +48,7 @@ instance FromJSON MtGoxFunds
 
 instance FromJSON MtGoxOrders
   where
-    parseJSON (Object o) = case M.lookup "return" o of
+    parseJSON (Object o) = case H.lookup "return" o of
         Just (Array orders) ->
             return $ MtGoxOrders (fromIntegral . V.length $ orders)
         Just _ -> mzero
@@ -55,7 +57,7 @@ instance FromJSON MtGoxOrders
 
 instance FromJSON MtGoxOrderQueued
   where
-    parseJSON (Object o) = case M.lookup "status" o of
+    parseJSON (Object o) = case H.lookup "status" o of
         Just statusV -> do
             status <- parseJSON statusV :: Parser String
             if "queued" `isInfixOf` status
@@ -73,23 +75,23 @@ hardcodedAuthSecret = "A0seCE45EgkyUOliU3wokMuRwq/AbdpVMJ353kmDXtH0mWdy9QqsSKVkA
 mtgoxApi :: String
 mtgoxApi = "https://mtgox.com/api/"
 
-extractBalances :: (IsString k, Ord k) => M.Map k Value -> Maybe (Value, Value)
+extractBalances :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Maybe (Value, Value)
 extractBalances o = do
     btc <- extractBalance "BTC" o
     usd <- extractBalance "USD" o
     return (btc, usd)
 
-extractBalance :: (IsString k, Ord k) => T.Text -> M.Map k Value -> Maybe Value
+extractBalance :: (Eq k, IsString k, Hashable k) =>T.Text -> H.HashMap k Value -> Maybe Value
 extractBalance currency o = do
-    balance <- M.lookup "return" o
+    balance <- H.lookup "return" o
                 >>= extractObject
-                >>= M.lookup "Wallets"
+                >>= H.lookup "Wallets"
                 >>= extractObject
-                >>= M.lookup currency
+                >>= H.lookup currency
                 >>= extractObject
-                >>= M.lookup "Balance"
+                >>= H.lookup "Balance"
                 >>= extractObject
-    M.lookup "value_int" balance
+    H.lookup "value_int" balance
 
 extractObject :: Value -> Maybe Object
 extractObject (Object o) = Just o
@@ -205,19 +207,20 @@ debugRequest4 = do
 
 letOrdersExecute :: IO (Maybe MtGoxOrders)
 letOrdersExecute =
-    let watchdogConf = customWatchdogConfig 100000 {- 100 ms -}
-                                            100000000 {- 10 seconds -}
-                                            (\_ _ -> return ()) {- no logging -}
-    in watchdog watchdogConf task
+    watchdog $ do
+        setInitialDelay 100000 {- 100 ms -}
+        setMaximumDelay 100000000 {- 10 seconds -}
+        setLoggingAction silentLogger {- no logging -}
+        watch task
   where
     task = do
         orders <- getOrders
         case orders of
-            Nothing -> return $ CompletedSuccessfully Nothing
+            Nothing -> return $ Right Nothing
             Just (MtGoxOrders count) ->
                 if count > 0
-                    then return $ FailedImmediately "still outstanding orders"
-                    else return $ CompletedSuccessfully orders
+                    then return $ Left "still outstanding orders"
+                    else return $ Right orders
 
 main :: IO ()
 main = do

@@ -18,9 +18,10 @@ import Control.Monad
 import Data.Aeson
 import Data.Aeson.Types
 import Data.String
+import Data.Hashable
 
 import qualified Data.Attoparsec as AP
-import qualified Data.Map as M
+import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
@@ -67,7 +68,7 @@ instance FromJSON PrivateInfoReply
         Nothing -> mzero
     parseJSON _ = mzero
 
-extractBalancesAndOps :: (IsString k, Ord k) =>M.Map k Value -> Maybe (Value, Value, Value, Value)
+extractBalancesAndOps :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Maybe (Value, Value, Value, Value)
 extractBalancesAndOps o = do
     btc <- extractBalance "BTC" o
     usd <- extractBalance "USD" o
@@ -75,23 +76,23 @@ extractBalancesAndOps o = do
     usdOps <- extractOperations "USD" o
     return (btc, usd, btcOps, usdOps)
 
-extractOperations :: (IsString k, Ord k) => T.Text -> M.Map k Value -> Maybe Value
+extractOperations :: (Eq k, IsString k, Hashable k) =>T.Text -> H.HashMap k Value -> Maybe Value
 extractOperations currency o =
-    M.lookup "Wallets" o
+    H.lookup "Wallets" o
         >>= extractObject
-        >>= M.lookup currency
+        >>= H.lookup currency
         >>= extractObject
-        >>= M.lookup "Operations"
+        >>= H.lookup "Operations"
 
-extractBalance :: (IsString k, Ord k) => T.Text -> M.Map k Value -> Maybe Value
+extractBalance :: (Eq k, IsString k, Hashable k) =>T.Text -> H.HashMap k Value -> Maybe Value
 extractBalance currency o = do
-    balance <- M.lookup "Wallets" o
+    balance <- H.lookup "Wallets" o
                 >>= extractObject
-                >>= M.lookup currency
+                >>= H.lookup currency
                 >>= extractObject
-                >>= M.lookup "Balance"
+                >>= H.lookup "Balance"
                 >>= extractObject
-    M.lookup "value_int" balance
+    H.lookup "value_int" balance
 
 extractObject :: Value -> Maybe Object
 extractObject (Object o) = Just o
