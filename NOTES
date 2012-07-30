@@ -38,29 +38,18 @@ API-Calls: Order result
 
 Just
   "{\"result\":\"success\",
-  \"return\":{\"order_id\":\"8d86b559-9551-43ef-95dd-d6c6eb0575bb\",
-  \"trades\":[{\"trade_id\":\"1337342838083902\",
-  \"primary\":\"Y\",
-  \"currency\":\"USD\",
-  \"type\":\"bid\",
-  \"properties\":\"market\",
-  \"item\":\"BTC\",
-  \"amount\":{\"value\":\"0.01000000\",
-  \"value_int\":\"1000000\",
-  \"display\":\"0.01000000\\u00a0BTC\",
-  \"display_short\":\"0.01\\u00a0BTC\",
-  \"currency\":\"BTC\"},
-  \"price\":{\"value\":\"5.12298\",
-  \"value_int\":\"512298\",
-  \"display\":\"$5.12298\",
-  \"display_short\":\"$5.12\",
-  \"currency\":\"USD\"},
-  \"date\":\"2012-05-18 12:07:18\"}],
-  \"total_amount\":{\"value\":\"0.01000000\",
-  \"value_int\":\"1000000\",
-  \"display\":\"0.01000000\\u00a0BTC\",
-  \"display_short\":\"0.01\\u00a0BTC\",
-  \"currency\":\"BTC\"}}}"
+  \"return\":{
+      \"order_id\":\"8d86b559-9551-43ef-95dd-d6c6eb0575bb\",
+      \"trades\":[{\"trade_id\":\"1337342838083902\",
+          \"primary\":\"Y\",
+          \"currency\":\"USD\",
+          \"type\":\"bid\",
+          \"properties\":\"market\",
+          \"item\":\"BTC\",
+          \"amount\":{\"value\":\"0.01000000\", \"value_int\":\"1000000\", \"display\":\"0.01000000\\u00a0BTC\", \"display_short\":\"0.01\\u00a0BTC\", \"currency\":\"BTC\"},
+          \"price\":{\"value\":\"5.12298\", \"value_int\":\"512298\", \"display\":\"$5.12298\", \"display_short\":\"$5.12\", \"currency\":\"USD\"},
+          \"date\":\"2012-05-18 12:07:18\"}],
+      \"total_amount\":{\"value\":\"0.01000000\", \"value_int\":\"1000000\", \"display\":\"0.01000000\\u00a0BTC\", \"display_short\":\"0.01\\u00a0BTC\", \"currency\":\"BTC\"}}}"
 
 API-Calls: Wallet history - gefiltert auf eine Trade-ID
 

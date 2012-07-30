@@ -4,7 +4,6 @@ module StreamCommand
     , StreamCommand (..)
     , StreamCommandNR (..)
     , StreamCommandWR (..)
-    , StreamCommandOrderType (..)
     , StreamWriter
     ) where
 
@@ -15,6 +14,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.Text as T
 
 import AuthCommand
+import AuthCommandReplyParsing
 
 data StreamCommand = StreamCommandNoReply { scnrCmd :: StreamCommandNR }
                    | StreamCommandWithReply {scwrCmd :: StreamCommandWR }
@@ -29,7 +29,7 @@ data StreamCommandWR = PrivateInfo { scNonce :: T.Text }
                      | IDKey { scNonce :: T.Text }
                      | FullDepth { scNonce :: T.Text }
                      | Order { scNonce :: T.Text
-                             , scOrderType :: StreamCommandOrderType
+                             , scOrderType :: OrderType
                              , scAmount :: Integer
                              }
                      | OpenOrderCount { scNonce :: T.Text }
@@ -38,9 +38,6 @@ data StreamCommandWR = PrivateInfo { scNonce :: T.Text }
                                    , scAmount :: Integer
                                    }
                      deriving (Show)
-
-data StreamCommandOrderType = OrderTypeBuyBTC | OrderTypeSellBTC
-                              deriving (Show)
 
 type StreamWriter = StreamCommand -> IO ()
 

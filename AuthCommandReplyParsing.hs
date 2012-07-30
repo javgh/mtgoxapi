@@ -6,6 +6,12 @@ module AuthCommandReplyParsing
     , OrderReply (..)
     , IDKeyReply (..)
     , OpenOrderCountReply (..)
+    , OrderType(..)
+    , OrderResult(..)
+    , OrderID(..)
+    , TradeID(..)
+    , WalletEntry(..)
+    , WalletHistory(..)
     , parsePrivateInfoReply
     , parseFullDepthReply
     , parseOrderReply
@@ -24,6 +30,8 @@ import qualified Data.Attoparsec as AP
 import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Vector as V
+
+import StreamParsing
 
 data PrivateInfoReply = PrivateInfoReply { pirBtcBalance :: Integer
                                          , pirUsdBalance :: Integer
@@ -46,11 +54,34 @@ data FullDepthReply = FullDepthReply { fdrAsks :: [DepthEntry]
                                      }
                       deriving (Show, Read)
 
-data OrderReply = OrderReply { orGUID :: T.Text }
+data OrderID = OrderID { oid :: T.Text }
+               deriving (Show)
+
+data TradeID = TradeID { tid :: T.Text }
+               deriving (Show)
+
+data OrderReply = OrderReply { orOrderID :: OrderID }
                   deriving (Show)
+
+data OrderResult = OrderResult { orTradeIDs :: [TradeID] }
+                   deriving (Show)
 
 data OpenOrderCountReply = OpenOrderCountReply { oocrCount :: Integer }
                            deriving (Show)
+
+data OrderType = OrderTypeBuyBTC | OrderTypeSellBTC
+                 deriving (Show)
+
+data WalletEntry = WalletEntry { weDate :: Integer
+                               , weType :: WalletOperationType
+                               , weAmount :: Integer
+                               , weBalance :: Integer
+                               , weInfo :: T.Text
+                               }
+                   deriving (Show)
+
+data WalletHistory = WalletHistory { whEntries :: [WalletEntry] }
+                     deriving (Show)
 
 instance FromJSON PrivateInfoReply
   where
@@ -114,7 +145,7 @@ instance FromJSON FullDepthReply
 
 instance FromJSON OrderReply
   where
-    parseJSON (String guid) = return $ OrderReply guid
+    parseJSON (String guid) = return $ OrderReply (OrderID guid)
     parseJSON _ = mzero
 
 instance FromJSON IDKeyReply
@@ -126,6 +157,50 @@ instance FromJSON OpenOrderCountReply
   where
     parseJSON (Array orders) =
         return $ OpenOrderCountReply (fromIntegral . V.length $ orders)
+    parseJSON _ = mzero
+
+instance FromJSON OrderResult
+  where
+    parseJSON (Object o) = case H.lookup "trades" o of
+        Just (Array trades) -> do
+            ids <- mapM extractTradeID (V.toList trades)
+            return $ OrderResult ids
+        Just _ -> mzero
+        Nothing -> mzero
+    parseJSON _ = mzero
+
+extractTradeID :: MonadPlus m => Value -> m TradeID
+extractTradeID (Object o) = case H.lookup "trade_id" o of
+    Just (String id) -> return $ TradeID id
+    Just _ -> mzero
+    Nothing -> mzero
+extractTradeID _ = mzero
+
+instance FromJSON WalletEntry
+  where
+    parseJSON (Object o) = do
+        date <- o .: "Date"
+        typeString <- o .: "Type" :: Parser T.Text
+        entryType <- case typeString of
+                        "fee" -> return USDFee
+                        "earned" -> return USDEarned
+                        "spent" -> return USDSpent
+                        _ -> mzero
+        amount <- coerceFromString (o .: "Value" >>=
+                                        \v -> v .: "value_int")
+        balance <- coerceFromString (o .: "Balance" >>=
+                                        \v -> v .: "value_int")
+        info <- o .: "Info"
+        return $ WalletEntry date entryType amount balance info
+    parseJSON _ = mzero
+
+instance FromJSON WalletHistory
+  where
+    parseJSON (Object o) = case H.lookup "result" o of
+        Just results -> do
+            entries <- parseJSON results :: Parser [WalletEntry]
+            return $ WalletHistory entries
+        Nothing -> mzero
     parseJSON _ = mzero
 
 coerceFromString :: Parser String -> Parser Integer

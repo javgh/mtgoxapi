@@ -3,6 +3,7 @@ module StreamParsing
     ( parseStreamLine
     , StreamMessage(..)
     , DepthType(..)
+    , WalletOperationType(..)
     ) where
 
 import Control.Applicative
@@ -29,7 +30,7 @@ data WalletOperationType = BTCDeposit
                          | BTCIn
                          | BTCOut
                          | USDFee
-                         deriving (Show)
+                         deriving (Eq, Show)
 
 data StreamMessage = TickerUpdateUSD { tuBid :: Integer
                                      , tuAsk :: Integer

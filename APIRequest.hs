@@ -225,8 +225,8 @@ letOrdersExecute =
 main :: IO ()
 main = do
     --debugRequest
-    --getFunds >>= print
-    debugRequest
+    getFunds >>= print
+    --debugRequest
     ----placeOrder "sell" "0.01" >>= print
     ----placeOrder "buy" "0.01" >>= print
     --_ <- letOrdersExecute
