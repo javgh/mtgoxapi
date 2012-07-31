@@ -1,10 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module MtGoxHttpAPI
-    (
+    ( getOrderCountR
+    , submitBtcBuyOrder
+    , submitBtcSellOrder
+    , getOrderResultR
+    , getWalletHistoryR
+    , getPrivateInfoR
+    , getBitcoinDepositAddressR
+    , withdrawBitcoins
+    , letOrdersExecuteR
+    , submitOrder
     ) where
 
 import Control.Applicative
+import Control.Arrow
 import Control.Error
 import Control.Monad
 import Control.Monad.IO.Class
@@ -13,6 +23,7 @@ import Data.Aeson
 import Data.Digest.Pure.SHA
 import Network.Curl
 import Network.HTTP.Base (urlEncodeVars)
+import Text.Printf
 
 import qualified Control.Exception as E
 import qualified Data.Attoparsec as AP
@@ -62,6 +73,8 @@ parseReply method v =
         Success r -> r
         Error _ -> error ("Unexpected result when calling method " ++ method)
 
+-- ^ Repeat an API call until it succeeds. Those functions which make use of
+-- this helper are marked with the suffix 'R'.
 reliableApiCall :: Maybe WatchdogLogger -> IO (Either String a) -> IO a
 reliableApiCall mLogger f = watchdog $ do
     case mLogger of
@@ -92,10 +105,10 @@ compileRequest credentials parameters =
         authKey = mgcAuthKey credentials
         body = urlEncodeVars parameters
         hmac = hmacSha512 (BL.fromChunks [authSecretDecoded]) (BL8.pack body)
-        hmacFormatted = B64.encode . (foldl1 B.append)
+        hmacFormatted = B64.encode . foldl1 B.append
                             . BL.toChunks . bytestringDigest $ hmac
-        headers = [ "Rest-Key: " ++ (B8.unpack authKey)
-                  , "Rest-Sign: " ++ (B8.unpack hmacFormatted)
+        headers = [ "Rest-Key: " ++ B8.unpack authKey
+                  , "Rest-Sign: " ++ B8.unpack hmacFormatted
                   ]
     in (headers, body)
 
@@ -162,6 +175,54 @@ getWalletHistoryR mLogger curlChan mtGoxCreds tradeID = do
         HttpApiSuccess v' -> 
             Just (parseReply "getWalletHistoryR" v') :: Maybe WalletHistory
 
+getPrivateInfoR :: Maybe WatchdogLogger-> CurlChan -> MtGoxCredentials -> IO (Maybe PrivateInfoReply)
+getPrivateInfoR mLogger curlChan mtGoxCreds = do
+    let uri = mtGoxApi ++ "1/generic/private/info"
+    v <- reliableApiCall mLogger $ callApi curlChan mtGoxCreds uri []
+    return $ case v of
+        HttpApiFailure -> Nothing
+        HttpApiSuccess v' -> 
+            Just (parseReply "getPrivateInfoR" v') :: Maybe PrivateInfoReply
+
+getBitcoinDepositAddressR mLogger curlChan mtGoxCreds = do
+    let uri = mtGoxApi ++ "1/generic/bitcoin/address"
+    v <- reliableApiCall mLogger $ callApi curlChan mtGoxCreds uri []
+    return $ case v of
+        HttpApiFailure -> Nothing
+        HttpApiSuccess v' -> 
+            Just (parseReply "getBitcoinDepositAddressR" v') :: Maybe BitcoinDepositAddress
+
+withdrawBitcoins :: CurlChan-> MtGoxCredentials-> BitcoinAddress-> Integer-> IO (Either String WithdrawStatus)
+withdrawBitcoins curlChan mtGoxCreds (BitcoinAddress addr) amount = do
+    let factor = 10 ^ (8 :: Integer)
+        doubleAmount = fromIntegral amount / factor
+        uri = mtGoxApi ++ "0/withdraw.php"
+        parameters = [ ("group1", "BTC")
+                     , ("btca", T.unpack addr)
+                     , ("amount", printf "%.8f" (doubleAmount :: Double))
+                     ]
+    customCallApi uri parameters
+  where
+    customCallApi uri parameters = do   -- needed for accessing version 0 API,
+                                        -- as this functionality is not (yet?)
+                                        -- available in version 1
+        nonce <- getNonce
+        let parameters' = ("nonce", T.unpack nonce) : parameters
+            (headers, body) = compileRequest mtGoxCreds parameters'
+        (status, payload) <- performCurlRequest curlChan uri
+                                [ CurlHttpHeaders headers
+                                , CurlPostFields [body]
+                                ]
+        return $ case status of
+            CurlOK -> case AP.parseOnly json (B8.pack payload) of
+                Left err' ->
+                    Left $ "JSON parse error when calling old API: " ++ err'
+                Right json -> case fromJSON json of
+                    (Error err'') ->
+                        Left $ "API parse error when calling old API: " ++ err''
+                    (Success v) -> Right v :: Either String WithdrawStatus
+            err -> Left $ "Curl error: " ++ show err
+
 letOrdersExecuteR :: Maybe WatchdogLogger-> CurlChan -> MtGoxCredentials -> IO (Maybe OpenOrderCountReply)
 letOrdersExecuteR mLogger curlChan mtGoxCreds =
     watchdog $ do
@@ -182,15 +243,19 @@ letOrdersExecuteR mLogger curlChan mtGoxCreds =
 processWalletHistories ::  [WalletHistory] -> OrderStats
 processWalletHistories histories =
     let entries = concatMap whEntries histories
-        amounts = map (\e -> (weType e, weAmount e)) entries
-        usdEarned = filter (((==) USDEarned) . fst) amounts
-        usdSpent = filter (((==) USDSpent) . fst) amounts
-        usdFee = filter (((==) USDFee) . fst) amounts
+        amounts = map (weType &&& weAmount) entries
+        usdEarned = filter ((USDEarned ==) . fst) amounts
+        usdSpent = filter ((USDSpent ==) . fst) amounts
+        usdFee = filter ((USDFee ==) . fst) amounts
     in OrderStats { usdEarned = sum (map snd usdEarned)
                   , usdSpent = sum (map snd usdSpent)
                   , usdFee = sum (map snd usdFee)
                   }
 
+-- ^ Submit an order and return 'OrderStats'. In case of some non-critical
+-- errors things are re-tried automatically, but if API errors happen or network
+-- errors occur during critical phases (like placing the order) a 'Left' with
+-- the error is returned.
 submitOrder :: Maybe WatchdogLogger-> CurlChan-> MtGoxCredentials-> OrderType-> Integer-> IO (Either String OrderStats)
 submitOrder mLogger curlChan mtGoxCreds orderType amount = runEitherT $ do
     -- step 1: make sure network connection is present
@@ -222,11 +287,14 @@ submitOrder mLogger curlChan mtGoxCreds orderType amount = runEitherT $ do
         history <- getWalletHistoryR mLogger curlChan mtGoxCreds tradeID
         return $ note "getWalletHistoryR failed" history
 
-debug = do
-    c <- initCurlWrapper
+--debug = do
+--    c <- initCurlWrapper
     -- 040982ab-04d9-4f2a-8455-316a47e75389
     --getOrderResultR Nothing c debugCredentials OrderTypeSellBTC "040982ab-04d9-4f2a-8455-316a47e75389" >>= print
     --getWalletHistoryR Nothing c debugCredentials (TradeID "1343679373020988") >>= print
     --letOrdersExecuteR Nothing c debugCredentials >>= print
     --submitOrder Nothing c debugCredentials OrderTypeSellBTC 1000000
-    submitOrder Nothing c debugCredentials OrderTypeBuyBTC 1000000
+    --submitOrder Nothing c debugCredentials OrderTypeSellBTC 1000000
+    --getBitcoinDepositAddressR Nothing c debugCredentials
+    --let addr = BitcoinAddress "1AvcR6BFmnd8SnZiJfDm6rrQ2aTkdHsf6N"
+    --withdrawBitcoins c debugCredentials addr 1000000 >>= print

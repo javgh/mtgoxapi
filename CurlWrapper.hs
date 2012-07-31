@@ -40,7 +40,7 @@ curlThread requestChan = withCurlDo $ do
         mapM_ (setopt h) opts
         rc <- perform h
         body <- concat . reverse <$> readIORef ref
-        --writeFile "/tmp/debug.json" body
+        writeFile "/tmp/debug.json" body
         --print body
         writeChan answerChan (rc, body)
         go h

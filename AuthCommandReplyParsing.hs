@@ -12,6 +12,9 @@ module AuthCommandReplyParsing
     , TradeID(..)
     , WalletEntry(..)
     , WalletHistory(..)
+    , BitcoinAddress(..)
+    , BitcoinDepositAddress(..)
+    , WithdrawStatus(..)
     , parsePrivateInfoReply
     , parseFullDepthReply
     , parseOrderReply
@@ -37,6 +40,7 @@ data PrivateInfoReply = PrivateInfoReply { pirBtcBalance :: Integer
                                          , pirUsdBalance :: Integer
                                          , pirBtcOperations :: Integer
                                          , pirUsdOperations :: Integer
+                                         , pirFee :: Double
                                          }
                         deriving (Show)
 
@@ -83,6 +87,17 @@ data WalletEntry = WalletEntry { weDate :: Integer
 data WalletHistory = WalletHistory { whEntries :: [WalletEntry] }
                      deriving (Show)
 
+data BitcoinAddress = BitcoinAddress { baAddress :: T.Text }
+                      deriving (Show)
+
+data BitcoinDepositAddress = BitcoinDepositAddress { bdaAddr :: BitcoinAddress }
+                             deriving (Show)
+
+data WithdrawStatus = WithdrawStatus { wsInfo :: T.Text
+                                     , wsReference :: T.Text
+                                     }
+                      deriving (Show)
+
 instance FromJSON PrivateInfoReply
   where
     parseJSON (Object o) = case extractBalancesAndOps o of
@@ -91,10 +106,12 @@ instance FromJSON PrivateInfoReply
             usdS <- parseJSON usdV :: Parser String
             btcOpsI <- parseJSON btcOps
             usdOpsI <- parseJSON usdOps
+            fee <- o .: "Trade_Fee"
             return PrivateInfoReply { pirBtcBalance = read btcS
                                     , pirUsdBalance = read usdS
                                     , pirBtcOperations = btcOpsI
                                     , pirUsdOperations = usdOpsI
+                                    , pirFee = fee
                                     }
         Nothing -> mzero
     parseJSON _ = mzero
@@ -201,6 +218,25 @@ instance FromJSON WalletHistory
             entries <- parseJSON results :: Parser [WalletEntry]
             return $ WalletHistory entries
         Nothing -> mzero
+    parseJSON _ = mzero
+
+instance FromJSON BitcoinAddress
+  where
+    parseJSON v = BitcoinAddress <$> parseJSON v
+
+instance FromJSON BitcoinDepositAddress
+  where
+    parseJSON (Object o) = BitcoinDepositAddress <$> o .: "addr"
+    parseJSON _ = mzero
+
+instance FromJSON WithdrawStatus
+  where
+    parseJSON (Object o) = do
+        status <- o .: "status"
+        reference <- o .: "reference"
+        if "are on their way" `T.isInfixOf` status
+            then return $ WithdrawStatus status reference
+            else mzero
     parseJSON _ = mzero
 
 coerceFromString :: Parser String -> Parser Integer
