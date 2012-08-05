@@ -16,6 +16,9 @@ data CurlData = CurlData { cdUrl :: URLString
 
 newtype CurlChan = CurlChan { unCC :: Chan CurlData }
 
+-- | Will start a thread which will execute cURL requests that are passed to it
+-- using 'performCurlRequest'. Internally only a single cURL handle is opened,
+-- which means that keep-alive connections are automatically reused.
 initCurlWrapper :: IO CurlChan
 initCurlWrapper = do
     chan <- newChan :: IO (Chan CurlData)
