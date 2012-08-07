@@ -31,6 +31,18 @@ library
                  , errors == 1.2.*
                  , QuickCheck == 2.4.*
   exposed-modules: Network.MtGoxAPI
+                   , Network.MtGoxAPI.Credentials
+                   , Network.MtGoxAPI.CurlWrapper
+                   , Network.MtGoxAPI.DepthStore
+                   , Network.MtGoxAPI.DepthStore.Adapter
+                   , Network.MtGoxAPI.Handles
+                   , Network.MtGoxAPI.HttpAPI
+                   , Network.MtGoxAPI.StreamAuthCommands
+                   , Network.MtGoxAPI.StreamCommands
+                   , Network.MtGoxAPI.StreamConnection
+                   , Network.MtGoxAPI.TickerMonitor
+                   , Network.MtGoxAPI.Types
+                   , Network.MtGoxAPI.WalletNotifier
   ghc-options: -O -Wall
 
 test-suite testsuite
