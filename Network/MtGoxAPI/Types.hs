@@ -7,6 +7,18 @@ module Network.MtGoxAPI.Types
     , IDKey(..)
     , FullDepth(..)
     , DepthEntry(..)
+    , OpenOrderCount(..)
+    , Order(..)
+    , OrderType(..)
+    , OrderID(..)
+    , OrderResult(..)
+    , TradeID(..)
+    , WalletHistory(..)
+    , PrivateInfo(..)
+    , BitcoinDepositAddress(..)
+    , BitcoinAddress(..)
+    , WithdrawStatus(..)
+    , WalletEntry(..)
     ) where
 
 import Control.Applicative

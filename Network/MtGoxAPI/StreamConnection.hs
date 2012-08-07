@@ -138,5 +138,10 @@ waitForSubscribesWithTimeout h =
 initMtGoxStream mtgoxCreds mtgoxAPIHandles =
     let task = openConnection mtGoxStreamHost mtGoxStreamPort
                                     mtgoxCreds mtgoxAPIHandles
-        ninetySeconds = 90 * 10 ^ (6 :: Integer)
-    in forkIO $ watchdog (setResetDuration ninetySeconds >> watch task)
+        watchdogConf = do
+            setResetDuration $ 90 * 10 ^ (6 :: Integer)
+            case mtgoxLogger mtgoxAPIHandles of
+                Just logger -> setLoggingAction logger
+                Nothing -> return ()
+            watch task
+    in forkIO $ watchdog watchdogConf

@@ -2,10 +2,17 @@ module Network.MtGoxAPI.Handles
     ( MtGoxAPIHandles(..)
     ) where
 
-import Network.MtGoxAPI.TickerMonitor
+import Control.Watchdog
+
+import Network.MtGoxAPI.Credentials
+import Network.MtGoxAPI.CurlWrapper
 import Network.MtGoxAPI.DepthStore
+import Network.MtGoxAPI.TickerMonitor
 
 data MtGoxAPIHandles = MtGoxAPIHandles
-                        { mtgoxTickerMonitorHandle :: TickerMonitorHandle
+                        { mtgoxCredentials :: MtGoxCredentials
+                        , mtgoxLogger :: Maybe WatchdogLogger
+                        , mtgoxTickerMonitorHandle :: TickerMonitorHandle
                         , mtgoxDepthStoreHandle :: DepthStoreHandle
+                        , mtgoxCurlHandle :: CurlHandle
                         }
