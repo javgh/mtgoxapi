@@ -14,18 +14,21 @@ import Network.MtGoxAPI.Handles
 import Network.MtGoxAPI.HttpAPI
 import Network.MtGoxAPI.StreamConnection
 import Network.MtGoxAPI.TickerMonitor
+import Network.MtGoxAPI.WalletNotifier
 
 initMtGoxAPI :: Maybe WatchdogLogger -> MtGoxCredentials -> IO MtGoxAPIHandles
 initMtGoxAPI mLogger mtgoxCreds = do
     tickerMonitorHandle <- initTickerMonitor
     depthStoreHandle <- initDepthStore
     curlHandle <- initCurlWrapper
+    walletNotifierHandle <- initWalletNotifier
     let mtgoxAPIHandles = MtGoxAPIHandles
                             { mtgoxCredentials = mtgoxCreds
                             , mtgoxLogger = mLogger
+                            , mtgoxCurlHandle = curlHandle
                             , mtgoxTickerMonitorHandle = tickerMonitorHandle
                             , mtgoxDepthStoreHandle = depthStoreHandle
-                            , mtgoxCurlHandle = curlHandle
+                            , mtgoxWalletNotifierHandle = walletNotifierHandle
                             }
     initMtGoxStream mtgoxCreds mtgoxAPIHandles
     return mtgoxAPIHandles
@@ -40,10 +43,13 @@ main = do
     mtgoxHandles <- initMtGoxAPI Nothing debugCredentials
 
     callHTTPApi mtgoxHandles getPrivateInfoR >>= print
+    putStrLn "waiting for deposit"
+    waitForBTCDeposit (mtgoxWalletNotifierHandle mtgoxHandles)
+    putStrLn "seen deposit"
 
-    let dsh = mtgoxDepthStoreHandle mtgoxHandles
-        -- tmh = mtgoxTickerMonitorHandle mtgoxHandles
-    monitorDepth dsh
+    --let dsh = mtgoxDepthStoreHandle mtgoxHandles
+    --    -- tmh = mtgoxTickerMonitorHandle mtgoxHandles
+    --monitorDepth dsh
 --    forever $ do
 --        getTickerStatus tmh >>= print
 --        threadDelay (10 ^ (6 :: Integer))

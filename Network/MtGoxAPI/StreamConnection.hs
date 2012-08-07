@@ -26,6 +26,7 @@ import Network.MtGoxAPI.Handles
 import Network.MtGoxAPI.StreamCommands
 import Network.MtGoxAPI.TickerMonitor
 import Network.MtGoxAPI.Types
+import Network.MtGoxAPI.WalletNotifier
 
 mtGoxStreamHost = "127.0.0.1"
 mtGoxStreamPort = PortNumber 10508
@@ -94,6 +95,7 @@ openConnection host port creds apiHandles = do
         -- prepare handles
         let tickerMonitorHandle = mtgoxTickerMonitorHandle apiHandles
             depthStoreHandle = mtgoxDepthStoreHandle apiHandles
+            walletNotifierHandle = mtgoxWalletNotifierHandle apiHandles
 
         -- get full depth
         sendStreamCommand h creds FullDepthCmd
@@ -105,6 +107,7 @@ openConnection host port creds apiHandles = do
             streamMessage <- readNextStreamMessageWithTimeout h
             updateTickerStatus tickerMonitorHandle streamMessage
             updateDepthStoreFromMessage depthStoreHandle streamMessage
+            updateWalletNotifier walletNotifierHandle streamMessage
 
 waitForCallResultWithTimeout :: Handle -> (StreamMessage -> Maybe a) -> IO a
 waitForCallResultWithTimeout h parser =
