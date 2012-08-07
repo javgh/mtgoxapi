@@ -8,6 +8,8 @@ module Network.MtGoxAPI
     , callHTTPApi
     , module Network.MtGoxAPI.HttpAPI
     , module Control.Watchdog
+    , TickerStatus(..)
+    , module Network.MtGoxAPI.Types
     ) where
 
 import Control.Watchdog
@@ -19,6 +21,7 @@ import Network.MtGoxAPI.Handles
 import Network.MtGoxAPI.HttpAPI
 import Network.MtGoxAPI.StreamConnection
 import Network.MtGoxAPI.TickerMonitor
+import Network.MtGoxAPI.Types
 import Network.MtGoxAPI.WalletNotifier
 
 -- | Rolls all the individual init functions into one. Namely
@@ -47,18 +50,3 @@ initMtGoxAPI mLogger mtgoxCreds = do
 callHTTPApi :: MtGoxAPIHandles-> (Maybe WatchdogLogger -> CurlHandle -> MtGoxCredentials -> t)-> t
 callHTTPApi apiData f =
     f (mtgoxLogger apiData) (mtgoxCurlHandle apiData) (mtgoxCredentials apiData)
-
---main :: IO ()
---main = do
---    mtgoxHandles <- initMtGoxAPI Nothing debugCredentials
---
---    callHTTPApi mtgoxHandles getPrivateInfoR >>= print
---    putStrLn "waiting for deposit"
---    waitForBTCDeposit (mtgoxWalletNotifierHandle mtgoxHandles)
---    putStrLn "seen deposit"
---    let dsh = mtgoxDepthStoreHandle mtgoxHandles
---        -- tmh = mtgoxTickerMonitorHandle mtgoxHandles
---    monitorDepth dsh
---    forever $ do
---        getTickerStatus tmh >>= print
---        threadDelay (10 ^ (6 :: Integer))

@@ -16,7 +16,6 @@ module Network.MtGoxAPI.HttpAPI
 import Control.Arrow
 import Control.Error
 import Control.Monad
-import Control.Monad.IO.Class
 import Control.Watchdog
 import Data.Aeson
 import Data.Digest.Pure.SHA
@@ -254,41 +253,28 @@ submitOrder :: Maybe WatchdogLogger-> CurlHandle -> MtGoxCredentials-> OrderType
 submitOrder mLogger curlHandle mtGoxCreds orderType amount = runEitherT $ do
     -- step 1: make sure network connection is present
     --         and no orders are pending
-    step1 <- liftIO $ letOrdersExecuteR mLogger curlHandle mtGoxCreds
-    (OpenOrderCount _) <- liftEither (note "letOrdersExecute failed" step1)
+    (OpenOrderCount _) <- noteT "letOrdersExecute failed" . MaybeT $
+                            letOrdersExecuteR mLogger curlHandle mtGoxCreds
     -- step 2: submit order
-    order <-
-        liftIO (case orderType of
-            OrderTypeBuyBTC -> submitBtcBuyOrder curlHandle mtGoxCreds amount
-            OrderTypeSellBTC -> submitBtcSellOrder curlHandle mtGoxCreds amount)
-        >>= liftEither
+    order <- EitherT $ case orderType of
+                        OrderTypeBuyBTC ->
+                            submitBtcBuyOrder curlHandle mtGoxCreds amount
+                        OrderTypeSellBTC ->
+                            submitBtcSellOrder curlHandle mtGoxCreds amount
     -- step 3: wait for order to complete
-    step3 <- liftIO $ letOrdersExecuteR mLogger curlHandle mtGoxCreds
     (OpenOrderCount _) <-
-        liftEither (note "after submitting order letOrdersExecute failed" step3)
+        noteT "after submitting order letOrdersExecute failed" . MaybeT $
+            letOrdersExecuteR mLogger curlHandle mtGoxCreds
     -- step 4: get trade ids
     let orderID = oOrderID order
-    step4 <-
-        liftIO $ getOrderResultR mLogger curlHandle mtGoxCreds orderType orderID
-    orderResult <- liftEither (note "getOrderResultR failed" step4)
+    orderResult <-
+        noteT "getOrderResultR failed" . MaybeT $
+            getOrderResultR mLogger curlHandle mtGoxCreds orderType orderID
     let tradeIDs = orTradeIDs orderResult
     -- step 5: collect wallet entries for all trade ids
-    step5 <- forM tradeIDs $ \tradeID ->
-                liftIO (getWalletHistory tradeID) >>= liftEither
-    return $ processWalletHistories step5
+    histories <- forM tradeIDs $ \tradeID -> EitherT (getWalletHistory tradeID)
+    return $ processWalletHistories histories
   where
     getWalletHistory tradeID = do
         history <- getWalletHistoryR mLogger curlHandle mtGoxCreds tradeID
         return $ note "getWalletHistoryR failed" history
-
---debug = do
---    c <- initCurlWrapper
-    -- 040982ab-04d9-4f2a-8455-316a47e75389
-    --getOrderResultR Nothing c debugCredentials OrderTypeSellBTC "040982ab-04d9-4f2a-8455-316a47e75389" >>= print
-    --getWalletHistoryR Nothing c debugCredentials (TradeID "1343679373020988") >>= print
-    --letOrdersExecuteR Nothing c debugCredentials >>= print
-    --submitOrder Nothing c debugCredentials OrderTypeSellBTC 1000000
-    --submitOrder Nothing c debugCredentials OrderTypeSellBTC 1000000
-    --getBitcoinDepositAddressR Nothing c debugCredentials
-    --let addr = BitcoinAddress "1AvcR6BFmnd8SnZiJfDm6rrQ2aTkdHsf6N"
-    --withdrawBitcoins c debugCredentials addr 1000000 >>= print
