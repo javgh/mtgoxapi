@@ -54,7 +54,7 @@ getTickerStatus' store = do
       | age >= 60 && age <= 300 = Left "Data stale"    -- will retry
       | otherwise = Right TickerUnavailable            -- give up
 
--- | Update ticker with new data
+-- | Update ticker with new data.
 updateTickerStatus :: TickerMonitorHandle -> StreamMessage -> IO ()
 updateTickerStatus TickerMonitorHandle { unTMH = tickerStore }
                    (update@TickerUpdateUSD {}) = do
