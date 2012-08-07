@@ -13,7 +13,6 @@ module Network.MtGoxAPI.HttpAPI
     , submitOrder
     ) where
 
-import Control.Applicative
 import Control.Arrow
 import Control.Error
 import Control.Monad
@@ -25,7 +24,6 @@ import Network.Curl
 import Network.HTTP.Base (urlEncodeVars)
 import Text.Printf
 
-import qualified Control.Exception as E
 import qualified Data.Attoparsec as AP
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as B64
@@ -34,7 +32,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
-import qualified Data.Vector as V
 
 import Network.MtGoxAPI.Credentials
 import Network.MtGoxAPI.CurlWrapper
@@ -63,9 +60,6 @@ instance FromJSON HttpApiResult where
 mtGoxApi :: String
 mtGoxApi = "https://mtgox.com/api/"
 
-ioTry :: IO a -> IO (Either E.IOException a)
-ioTry = E.try
-
 parseReply ::  FromJSON a => String -> Value -> a
 parseReply method v =
     case fromJSON v of
@@ -93,7 +87,7 @@ callApi curlHandle mtGoxCred uri parameters = do
     return $ case status of
         CurlOK -> case AP.parseOnly json (B8.pack payload) of
             Left err' -> Left $ "JSON parse error: " ++ err'
-            Right json -> case fromJSON json of
+            Right jsonV -> case fromJSON jsonV of
                 (Error err'') -> Left $ "API parse error: " ++ err''
                 (Success v) -> Right v :: Either String HttpApiResult
         err -> Left $ "Curl error: " ++ show err
@@ -183,6 +177,7 @@ getPrivateInfoR mLogger curlHandle mtGoxCreds = do
         HttpApiSuccess v' -> 
             Just (parseReply "getPrivateInfoR" v') :: Maybe PrivateInfo
 
+getBitcoinDepositAddressR :: Maybe WatchdogLogger-> CurlHandle-> MtGoxCredentials-> IO (Maybe BitcoinDepositAddress)
 getBitcoinDepositAddressR mLogger curlHandle mtGoxCreds = do
     let uri = mtGoxApi ++ "1/generic/bitcoin/address"
     v <- reliableApiCall mLogger $ callApi curlHandle mtGoxCreds uri []
@@ -216,7 +211,7 @@ withdrawBitcoins curlHandle mtGoxCreds (BitcoinAddress addr) amount = do
             CurlOK -> case AP.parseOnly json (B8.pack payload) of
                 Left err' ->
                     Left $ "JSON parse error when calling old API: " ++ err'
-                Right json -> case fromJSON json of
+                Right jsonV -> case fromJSON jsonV of
                     (Error err'') ->
                         Left $ "API parse error when calling old API: " ++ err''
                     (Success v) -> Right v :: Either String WithdrawStatus
@@ -243,12 +238,12 @@ processWalletHistories ::  [WalletHistory] -> OrderStats
 processWalletHistories histories =
     let entries = concatMap whEntries histories
         amounts = map (weType &&& weAmount) entries
-        usdEarned = filter ((USDEarned ==) . fst) amounts
-        usdSpent = filter ((USDSpent ==) . fst) amounts
-        usdFee = filter ((USDFee ==) . fst) amounts
-    in OrderStats { usdEarned = sum (map snd usdEarned)
-                  , usdSpent = sum (map snd usdSpent)
-                  , usdFee = sum (map snd usdFee)
+        usdEarnedL = filter ((USDEarned ==) . fst) amounts
+        usdSpentL = filter ((USDSpent ==) . fst) amounts
+        usdFeeL = filter ((USDFee ==) . fst) amounts
+    in OrderStats { usdEarned = sum (map snd usdEarnedL)
+                  , usdSpent = sum (map snd usdSpentL)
+                  , usdFee = sum (map snd usdFeeL)
                   }
 
 -- ^ Submit an order and return 'OrderStats'. In case of some non-critical

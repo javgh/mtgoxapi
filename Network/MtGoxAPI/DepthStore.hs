@@ -22,6 +22,7 @@ import Control.Watchdog
 import Data.IxSet((@<), (@>=))
 import Data.Time.Clock
 import Data.Typeable
+import Test.QuickCheck
 
 import qualified Data.IxSet as I
 
@@ -44,6 +45,13 @@ instance I.Indexable DepthStoreEntry
                     , I.ixFun $ \e -> [ dseTimestamp e ]
                     ]
 
+instance Arbitrary DepthStoreEntry where
+    arbitrary = do
+        let timestamp = read "2012-06-25 00:00:00 UTC" :: UTCTime
+        amount <- choose (1 * 10^(8::Integer), 10 * 10^(8::Integer))
+        price <- choose (1 * 10^(5::Integer), 8 * 10^(5::Integer))
+        return $ DepthStoreEntry amount price timestamp
+
 data DepthStoreType = DepthStoreAsk | DepthStoreBid
                       deriving (Show)
 
@@ -55,7 +63,7 @@ data DepthStoreData = DepthStoreData { dsdAskStore :: I.IxSet DepthStoreEntry
                       deriving (Show)
 
 data DepthStoreHandle = DepthStoreHandle
-                            { unDSH :: MVar DepthStoreData }
+                            { _unDSH :: MVar DepthStoreData }
 
 initDepthStore :: IO DepthStoreHandle
 initDepthStore = do
@@ -88,10 +96,10 @@ updateDepthStore (DepthStoreHandle dsdMVar) t amount price = do
                     (updateStore askStore' amount price timestamp, bidStore')
                 DepthStoreBid ->
                     (askStore', updateStore bidStore' amount price timestamp)
-    swapMVar dsdMVar dsd { dsdAskStore = askStore''
-                         , dsdBidStore = bidStore''
-                         , dsdLastUpdate = Just timestamp
-                         }
+    _ <- swapMVar dsdMVar dsd { dsdAskStore = askStore''
+                              , dsdBidStore = bidStore''
+                              , dsdLastUpdate = Just timestamp
+                              }
     return ()
 
 isDataFresh :: DepthStoreHandle -> IO (Either String ())
@@ -192,7 +200,7 @@ simulateBTC remainingAmount ((dse@DepthStoreEntry {}):entries) =
                      y = simulateBTC (remainingAmount - amount) entries
                  in (+) x <$> y
   where
-    adjustZeros = round . (/ 10 ^ 8) . fromIntegral
+    adjustZeros = round . (/ (10 ^ (8 :: Integer) :: Double)) . fromIntegral
 
 simulateUSD :: Integer -> [DepthStoreEntry] -> Maybe Integer
 simulateUSD 0 _ = Just 0
@@ -207,5 +215,6 @@ simulateUSD remainingUsdAmount ((dse@DepthStoreEntry {}):entries) =
                      y = simulateUSD (remainingUsdAmount - totalCost) entries
                  in (+) x <$> y
   where
-    adjustZeros = round . (/ 10 ^ 8) . fromIntegral
-    adjustedDevide a b = round . (/ fromIntegral b) . fromIntegral . (* 10 ^ 8) $ a
+    adjustZeros = round . (/ (10 ^ (8 :: Integer) :: Double)) . fromIntegral
+    adjustedDevide a b = round . (/ (fromIntegral b :: Double))
+                            . fromIntegral . (* 10 ^ (8 :: Integer)) $ a

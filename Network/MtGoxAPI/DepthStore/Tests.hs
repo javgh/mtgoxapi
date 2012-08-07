@@ -2,9 +2,7 @@ module Network.MtGoxAPI.DepthStore.Tests
     ( depthStoreTests
     ) where
 
-import Control.Applicative
 import Data.Maybe
-import Data.Time.Clock
 import Data.Typeable
 import Test.Framework
 import Test.Framework.Providers.QuickCheck2
@@ -13,15 +11,6 @@ import Test.QuickCheck
 import qualified Data.IxSet as I
 
 import Network.MtGoxAPI.DepthStore
-
-timestamp :: UTCTime
-timestamp = read "2012-06-25 00:00:00 UTC"
-
-instance Arbitrary DepthStoreEntry where
-    arbitrary = do
-        amount <- choose (1 * 10^8, 10 * 10^8)
-        price <- choose (1 * 10^5, 8 * 10^5)
-        return $ DepthStoreEntry amount price timestamp
 
 returnDescending :: (I.Indexable a, Typeable a, Ord a) => [a] -> [a]
 returnDescending entries =
@@ -46,13 +35,14 @@ propLowerAmountAlwaysOk entries a1 a2 =
 
 propSellingAndBuyingMatches :: [DepthStoreEntry] -> Integer -> Property
 propSellingAndBuyingMatches entries amount =
-    let amount' = amount * 10^5
+    let amount' = amount * 10^(5::Integer)
         entries' = returnAscending entries
         sim1 = simulateUSD amount' entries'
         sim2 = simulateBTC (fromMaybe 0 sim1) entries'
     in amount' >= 0 && isJust sim1 ==>
         isJust sim2 && Just amount' == sim2
 
+checkTotalPriceIsHigherOrEqual :: Ord a => Maybe a -> Maybe a -> Bool
 checkTotalPriceIsHigherOrEqual (Just a) (Just b) = a >= b
 checkTotalPriceIsHigherOrEqual _ _ = False
 

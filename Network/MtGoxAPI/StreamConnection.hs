@@ -28,7 +28,10 @@ import Network.MtGoxAPI.TickerMonitor
 import Network.MtGoxAPI.Types
 import Network.MtGoxAPI.WalletNotifier
 
+mtGoxStreamHost :: HostName
 mtGoxStreamHost = "127.0.0.1"
+
+mtGoxStreamPort :: PortID
 mtGoxStreamPort = PortNumber 10508
 
 mtGoxTickerChannel :: T.Text
@@ -67,10 +70,12 @@ readNextStreamMessageWithTimeout h =
     parseStreamLine <$>
         wrapInTimeout h "MtGox did not send data for a while." (B.hGetLine h)
 
+sendStreamCommand :: Handle -> MtGoxCredentials -> StreamCommand -> IO ()
 sendStreamCommand h creds cmd = do
     encodedCmd <- encodeStreamCommand cmd creds
     BL.hPutStr h encodedCmd >> B.hPutStr h "\n"
 
+openConnection :: HostName-> PortID-> MtGoxCredentials-> MtGoxAPIHandles-> IO (Either String ())
 openConnection host port creds apiHandles = do
     status <- try go :: IO (Either IOException (Either String ()))
     case status of
@@ -138,6 +143,7 @@ waitForSubscribesWithTimeout h =
             then return $ reverse msgs'
             else go msgs'
 
+initMtGoxStream :: MtGoxCredentials -> MtGoxAPIHandles -> IO ThreadId
 initMtGoxStream mtgoxCreds mtgoxAPIHandles =
     let task = openConnection mtGoxStreamHost mtGoxStreamPort
                                     mtgoxCreds mtgoxAPIHandles

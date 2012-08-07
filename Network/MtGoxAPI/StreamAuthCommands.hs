@@ -28,13 +28,10 @@ module Network.MtGoxAPI.StreamAuthCommands
 -- }
 
 import Data.Aeson
-import Data.Aeson.Types
 import Data.Digest.Pure.SHA
 import Data.Time.Clock.POSIX
-import Data.Word
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
@@ -53,21 +50,21 @@ data StreamAuthCommandData = StreamAuthCommandData
 getNonce :: IO T.Text
 getNonce = do
     now <- getPOSIXTime
-    let nonce = T.pack . show . round $ now * 1000000
-    return nonce
+    let nonce = round $ now * 1000000 :: Integer
+    return $ (T.pack . show) nonce
 
 prepareCallPayload :: StreamAuthCommandData -> BL.ByteString
-prepareCallPayload (StreamAuthCommandData { sacdCall = sacdCall
-                                          , sacdParameters = sacdParameters
-                                          , sacdSetBTCUSD = sacdSetBTCUSD
-                                          , sacdNonce = sacdNonce
+prepareCallPayload (StreamAuthCommandData { sacdCall = call
+                                          , sacdParameters = parameters
+                                          , sacdSetBTCUSD = setBTCUSD
+                                          , sacdNonce = nonce
                                           }) =
-    let alwaysPresent = [ "id" .= sacdNonce
-                        , "call" .= sacdCall
-                        , "nonce" .= sacdNonce
-                        , "params" .= toMap sacdParameters
+    let alwaysPresent = [ "id" .= nonce
+                        , "call" .= call
+                        , "nonce" .= nonce
+                        , "params" .= toMap parameters
                         ]
-        optionalAddon = if sacdSetBTCUSD
+        optionalAddon = if setBTCUSD
                             then [ "item" .= ("BTC" :: T.Text)
                                  , "currency" .= ("USD" :: T.Text)
                                  ]

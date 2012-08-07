@@ -6,7 +6,6 @@ module Network.MtGoxAPI.StreamCommands
     ) where
 
 import Data.Aeson
-import Data.Aeson.Types
 
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Text as T
@@ -24,13 +23,13 @@ encodeStreamCommand :: StreamCommand -> MtGoxCredentials -> IO L.ByteString
 encodeStreamCommand cmd creds = do
     nonce <- getNonce
     let v = case cmd of
-                UnsubscribeCmd { scChannel = scChannel} ->
+                UnsubscribeCmd { scChannel = channel} ->
                     object [ "op" .= ("unsubscribe" :: T.Text)
-                           , "channel" .= scChannel
+                           , "channel" .= channel
                            ]
-                PrivateSubscribeCmd { scKey = scKey } ->
+                PrivateSubscribeCmd { scKey = key } ->
                     object [ "op" .= ("mtgox.subscribe" :: T.Text)
-                           , "key" .= scKey
+                           , "key" .= key
                            ]
                 IDKeyCmd ->
                     let idKeyCmd =

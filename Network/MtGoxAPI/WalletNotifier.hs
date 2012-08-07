@@ -18,9 +18,8 @@ initWalletNotifier = WalletNotifierHandle <$> newEmptyMVar
 updateWalletNotifier :: WalletNotifierHandle -> StreamMessage -> IO ()
 updateWalletNotifier handle (wo@WalletOperation {}) =
     case woType wo of
-        BTCDeposit -> do
-            tryPutMVar (unWNH handle) ()   -- write to MVar, if not already full
-            return ()
+        BTCDeposit -> tryPutMVar (unWNH handle) () >> return ()
+                            -- write to MVar, if not already full
         _ -> return ()
 updateWalletNotifier _ _ = return ()
 

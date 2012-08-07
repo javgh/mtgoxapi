@@ -1,29 +1,27 @@
 module Network.MtGoxAPI.DepthStore.StressTest
-    (
+    ( stressTest
     ) where
 
-import Control.Concurrent
 import Control.Monad
 import Data.Time.Clock
 import System.Random
 
 import Network.MtGoxAPI.DepthStore
 
-addRandomEntry :: DepthStoreChan -> IO ()
-addRandomEntry chan = do
+addRandomEntry :: DepthStoreHandle -> IO ()
+addRandomEntry handle = do
     t <- randomIO >>= \x -> if x
                                 then return DepthStoreAsk
                                 else return DepthStoreBid
-    amount <- randomRIO (1 * 10^8, 10 * 10^8)
-    price <- randomRIO (1 * 10^5, 8 * 10^5)
-    updateDepthStore chan t amount price
+    amount <- randomRIO (1 * 10^(8::Integer), 10 * 10^(8::Integer))
+    price <- randomRIO (1 * 10^(5::Integer), 8 * 10^(5::Integer))
+    updateDepthStore handle t amount price
 
+stressTest :: IO ()
 stressTest = do
-    chan <- initDepthStore
+    handle <- initDepthStore
     getCurrentTime >>= print
     forever $ do
-        replicateM_ 25000 $ addRandomEntry chan
-        simulateBTCSell chan 0
+        replicateM_ 25000 $ addRandomEntry handle
+        _ <- simulateBTCSell handle 0
         getCurrentTime >>= print
-
-main = stressTest

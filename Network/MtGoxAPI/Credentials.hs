@@ -11,7 +11,6 @@ import Data.Word
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
-import qualified Data.ByteString.Lazy as BL
 
 data MtGoxCredentials = MtGoxCredentials { mgcAuthKey :: B.ByteString
                                          , mgcAuthKeyDecoded :: B.ByteString
@@ -54,4 +53,5 @@ debugMtGoxAuthKey = "5be9c2b8-6f85-408d-a8de-18db2f5fc3af"
 debugMtGoxAuthSecret :: B.ByteString
 debugMtGoxAuthSecret = "A0seCE45EgkyUOliU3wokMuRwq/AbdpVMJ353kmDXtH0mWdy9QqsSKVkAer1AbfG4bYUO4YKVyh2ovO4pR1lag=="
 
+debugCredentials :: MtGoxCredentials
 debugCredentials = initMtGoxCredentials debugMtGoxAuthKey debugMtGoxAuthSecret

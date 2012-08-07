@@ -14,18 +14,18 @@ monitorDepth :: DepthStoreHandle -> IO ()
 monitorDepth handle = forever $ do
     putStrLn ""
     putStrLn "-- Fees --"
-    simulateCircle handle $ 1* 10^5
-    simulateCircle handle $ 2 * 10^5
-    simulateCircle handle $ 5 * 10^5
-    simulateCircle handle $ 10 * 10^5
-    simulateCircle handle $ 15 * 10^5
-    simulateCircle handle $ 20 * 10^5
-    simulateCircle handle $ 100 * 10^5
-    simulateCircle handle $ 500 * 10^5
-    simulateCircle handle $ 1000 * 10^5
-    simulateCircle handle $ 2000 * 10^5
-    simulateCircle handle $ 5000 * 10^5
-    threadDelay $ 10 * 10^6
+    simulateCircle handle $ 1* 10^(5::Integer)
+    simulateCircle handle $ 2 * 10^(5::Integer)
+    simulateCircle handle $ 5 * 10^(5::Integer)
+    simulateCircle handle $ 10 * 10^(5::Integer)
+    simulateCircle handle $ 15 * 10^(5::Integer)
+    simulateCircle handle $ 20 * 10^(5::Integer)
+    simulateCircle handle $ 100 * 10^(5::Integer)
+    simulateCircle handle $ 500 * 10^(5::Integer)
+    simulateCircle handle $ 1000 * 10^(5::Integer)
+    simulateCircle handle $ 2000 * 10^(5::Integer)
+    simulateCircle handle $ 5000 * 10^(5::Integer)
+    threadDelay $ 10 * 10^(6::Integer)
 
 mtgoxFee :: Double
 mtgoxFee = 0.006
@@ -54,12 +54,12 @@ simulateCircle handle usdAmount = do
 
 formatUSD :: Integer -> String
 formatUSD a =
-    let a' = fromIntegral a / 10 ^ 5 :: Double
+    let a' = fromIntegral a / 10 ^ (5 :: Integer) :: Double
     in printf "%.5f USD" a'
 
 formatBTC :: Integer -> String
 formatBTC a =
-    let a' = fromIntegral a / 10 ^ 8 :: Double
+    let a' = fromIntegral a / 10 ^ (8 :: Integer) :: Double
     in printf "%.8f BTC" a'
 
 formatPercent :: Double -> String

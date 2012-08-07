@@ -27,14 +27,12 @@ import Data.Aeson
 import Data.Aeson.Types
 import Data.Hashable
 import Data.String
-import Network
 
 import qualified Data.Attoparsec as AP
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import qualified System.IO as IO
 
 data DepthType = Ask | Bid
                  deriving (Eq, Show)
@@ -172,11 +170,11 @@ parseWallet wallet = do
         "fee" -> go USDFee "USD"
         _ -> return OtherMessage
   where
-    go checkedOp expectedCurrency = do
+    go checkedOp expCurrency = do
         amountDetails <- wallet .: "amount"
         amount <- coerceFromString $ amountDetails .: "value_int"
         currency <- amountDetails .: "currency" :: Parser String
-        if currency == expectedCurrency
+        if currency == expCurrency
             then return $ WalletOperation { woType = checkedOp
                                           , woAmount = amount
                                           }
@@ -206,10 +204,10 @@ convertTypeStr _ = Nothing
 
 parseTicker :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Parser StreamMessage
 parseTicker ticker = case extractTickerData ticker of
-    Just (buy, sell, last) ->
+    Just (buy, sell, lst) ->
         TickerUpdateUSD <$> coerceFromString (parseJSON buy)
                         <*> coerceFromString (parseJSON sell)
-                        <*> coerceFromString (parseJSON last)
+                        <*> coerceFromString (parseJSON lst)
     Nothing -> mzero
 
 coerceFromString :: Parser String -> Parser Integer
@@ -314,6 +312,7 @@ instance FromJSON FullDepth
     parseJSON (Object o) =
         FullDepth <$> o .: "asks"
                   <*> o .: "bids"
+    parseJSON _ = mzero
 
 instance FromJSON Order
   where
@@ -343,7 +342,7 @@ instance FromJSON OrderResult
 
 extractTradeID :: MonadPlus m => Value -> m TradeID
 extractTradeID (Object o) = case H.lookup "trade_id" o of
-    Just (String id) -> return $ TradeID id
+    Just (String tradeID) -> return $ TradeID tradeID
     Just _ -> mzero
     Nothing -> mzero
 extractTradeID _ = mzero
