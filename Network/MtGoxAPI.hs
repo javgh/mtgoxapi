@@ -6,7 +6,10 @@ module Network.MtGoxAPI
     , simulateUSDSell
     , waitForBTCDeposit
     , callHTTPApi
+    , callHTTPApi'
     , module Network.MtGoxAPI.HttpAPI
+    , module Network.MtGoxAPI.Credentials
+    , module Network.MtGoxAPI.Handles
     , module Control.Watchdog
     , TickerStatus(..)
     , module Network.MtGoxAPI.Types
@@ -50,3 +53,9 @@ initMtGoxAPI mLogger mtgoxCreds = do
 callHTTPApi :: MtGoxAPIHandles-> (Maybe WatchdogLogger -> CurlHandle -> MtGoxCredentials -> t)-> t
 callHTTPApi apiData f =
     f (mtgoxLogger apiData) (mtgoxCurlHandle apiData) (mtgoxCredentials apiData)
+
+-- | Helper function to call functions from 'Network.MtGoxAPI.HttpAPI' that do
+-- not use a logger.
+callHTTPApi' :: MtGoxAPIHandles -> (CurlHandle -> MtGoxCredentials -> t) -> t
+callHTTPApi' apiData f =
+    f (mtgoxCurlHandle apiData) (mtgoxCredentials apiData)
