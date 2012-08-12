@@ -22,7 +22,6 @@ import Control.Watchdog
 import Data.IxSet((@<), (@>=))
 import Data.Time.Clock
 import Data.Typeable
-import Test.QuickCheck
 
 import qualified Data.IxSet as I
 
@@ -44,13 +43,6 @@ instance I.Indexable DepthStoreEntry
     empty = I.ixSet [ I.ixFun $ \e -> [ dsePrice e ]
                     , I.ixFun $ \e -> [ dseTimestamp e ]
                     ]
-
-instance Arbitrary DepthStoreEntry where
-    arbitrary = do
-        let timestamp = read "2012-06-25 00:00:00 UTC" :: UTCTime
-        amount <- choose (1 * 10^(8::Integer), 10 * 10^(8::Integer))
-        price <- choose (1 * 10^(5::Integer), 8 * 10^(5::Integer))
-        return $ DepthStoreEntry amount price timestamp
 
 data DepthStoreType = DepthStoreAsk | DepthStoreBid
                       deriving (Show)

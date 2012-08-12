@@ -29,7 +29,6 @@ library
                  , HTTP == 4000.2.*
                  , transformers == 0.3.*
                  , errors == 1.2.*
-                 , QuickCheck == 2.4.*
   exposed-modules: Network.MtGoxAPI
                    , Network.MtGoxAPI.Credentials
                    , Network.MtGoxAPI.CurlWrapper
