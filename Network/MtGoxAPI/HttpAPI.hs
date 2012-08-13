@@ -11,6 +11,7 @@ module Network.MtGoxAPI.HttpAPI
     , withdrawBitcoins
     , letOrdersExecuteR
     , submitOrder
+    , OrderStats(..)
     ) where
 
 import Control.Arrow
