@@ -129,7 +129,8 @@ collapseErrors Nothing = Nothing
 
 -- | Simulate how much USD can be earned by selling the specified amount of BTC.
 -- The function will return 'Nothing' in case there is not enough depth to cover
--- the full amount or - more likely - no recent data is available.
+-- the full amount or - more likely - no recent data is available. In the latter
+-- case it will have retried a few times before giving up.
 simulateBTCSell :: DepthStoreHandle -> Integer -> IO (Maybe Integer)
 simulateBTCSell handle@(DepthStoreHandle dsdMVar) amount =
     collapseErrors <$> repeatSimulation handle simulation
