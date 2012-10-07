@@ -32,8 +32,8 @@ import Network.MtGoxAPI.WalletNotifier
 -- 'initWalletNotifier' and finally 'initMtGoxStream'. All handles are returned
 -- in one package and can then be used in combination with the various functions
 -- from the submodules which are re-exported here for convenience.
-initMtGoxAPI :: Maybe WatchdogLogger -> MtGoxCredentials -> IO MtGoxAPIHandles
-initMtGoxAPI mLogger mtgoxCreds = do
+initMtGoxAPI :: Maybe WatchdogLogger-> MtGoxCredentials -> FullDepthSetting -> IO MtGoxAPIHandles
+initMtGoxAPI mLogger mtgoxCreds fullDepthSetting = do
     tickerMonitorHandle <- initTickerMonitor
     depthStoreHandle <- initDepthStore
     curlHandle <- initCurlWrapper
@@ -46,7 +46,7 @@ initMtGoxAPI mLogger mtgoxCreds = do
                             , mtgoxDepthStoreHandle = depthStoreHandle
                             , mtgoxWalletNotifierHandle = walletNotifierHandle
                             }
-    _ <- initMtGoxStream mtgoxCreds mtgoxAPIHandles
+    _ <- initMtGoxStream mtgoxCreds fullDepthSetting mtgoxAPIHandles
     return mtgoxAPIHandles
 
 -- | Helper function to call functions from 'Network.MtGoxAPI.HttpAPI'.

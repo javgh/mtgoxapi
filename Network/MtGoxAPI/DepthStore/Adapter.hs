@@ -1,6 +1,7 @@
 module Network.MtGoxAPI.DepthStore.Adapter
     ( updateDepthStoreFromMessage
     , updateDepthStoreFromFullDepth
+    , skipFullDepthRequest
     ) where
 
 import Network.MtGoxAPI.Types
@@ -22,3 +23,6 @@ updateDepthStoreFromFullDepth handle depth = do
   where
     updateCmd t (DepthEntry { deAmount = amount, dePrice = price }) =
         updateDepthStore handle t amount price
+
+skipFullDepthRequest :: DepthStoreHandle -> IO ()
+skipFullDepthRequest = setHasFullDepth

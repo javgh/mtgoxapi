@@ -4,6 +4,7 @@ module Network.MtGoxAPI.StreamConnection
     , mtGoxTickerChannel
     , mtGoxDepthChannel
     , mtGoxTradeChannel
+    , FullDepthSetting(..)
     ) where
 
 import Control.Applicative
@@ -46,16 +47,6 @@ mtGoxTradeChannel = "dbf1dee9-4f2e-4a08-8cb7-748919a71b21"
 mtGoxTimeout :: Int
 mtGoxTimeout = 2 * 60 * 10 ^ (6 :: Integer)
 
----- | Starts a thread that will connect to the data stream
----- from Mt. Gox and call the supplied hook setups once with a writer
----- for the connection and expects the setup to return the actual hook
----- which will then be called for every parsed message.
----- A watchdog maintains the connection.
---initMtGoxStream :: [HookSetup] -> IO ThreadId
---initMtGoxStream hookSetups =
---    let task = socketLoop hookSetups
---    in forkIO $ watchdog (watch task)
-
 wrapInTimeout :: Handle -> String -> IO a -> IO a
 wrapInTimeout h errMsg action = do
     resultM <- timeout mtGoxTimeout action
@@ -75,8 +66,8 @@ sendStreamCommand h creds cmd = do
     encodedCmd <- encodeStreamCommand cmd creds
     BL.hPutStr h encodedCmd >> B.hPutStr h "\n"
 
-openConnection :: HostName-> PortID-> MtGoxCredentials-> MtGoxAPIHandles-> IO (Either String ())
-openConnection host port creds apiHandles = do
+openConnection :: HostName-> PortID-> MtGoxCredentials-> FullDepthSetting-> MtGoxAPIHandles-> IO (Either String ())
+openConnection host port creds fullDepthSetting apiHandles = do
     status <- try go :: IO (Either IOException (Either String ()))
     case status of
         Right result -> return result
@@ -94,7 +85,7 @@ openConnection host port creds apiHandles = do
 
         -- get idkey and subscribe to wallet operations channel
         sendStreamCommand h creds IDKeyCmd
-        idKey <- waitForCallResultWithTimeout h parseIDKeyCallResult
+        (buffer1, idKey) <- waitForCallResultWithTimeout h parseIDKeyCallResult
         sendStreamCommand h creds $ PrivateSubscribeCmd (idkKey idKey)
 
         -- prepare handles
@@ -102,10 +93,26 @@ openConnection host port creds apiHandles = do
             depthStoreHandle = mtgoxDepthStoreHandle apiHandles
             walletNotifierHandle = mtgoxWalletNotifierHandle apiHandles
 
-        -- get full depth
-        sendStreamCommand h creds FullDepthCmd
-        fullDepth <- waitForCallResultWithTimeout h parseFullDepthCallResult
-        updateDepthStoreFromFullDepth depthStoreHandle fullDepth
+        -- rewind buffer
+        forM_ buffer1 $ \streamMessage -> do
+            updateTickerStatus tickerMonitorHandle streamMessage
+            updateDepthStoreFromMessage depthStoreHandle streamMessage
+            updateWalletNotifier walletNotifierHandle streamMessage
+
+        -- full depth step
+        case fullDepthSetting of
+            RequestFullDepth -> do
+                -- get full depth
+                sendStreamCommand h creds FullDepthCmd
+                (buffer2, fullDepth) <- waitForCallResultWithTimeout h parseFullDepthCallResult
+                updateDepthStoreFromFullDepth depthStoreHandle fullDepth
+
+                -- rewind buffer
+                forM_ buffer2 $ \streamMessage -> do
+                    updateTickerStatus tickerMonitorHandle streamMessage
+                    updateDepthStoreFromMessage depthStoreHandle streamMessage
+                    updateWalletNotifier walletNotifierHandle streamMessage
+            SkipFullDepth -> skipFullDepthRequest depthStoreHandle
 
         -- enter main loop and process incoming messages
         forever $ do
@@ -114,19 +121,19 @@ openConnection host port creds apiHandles = do
             updateDepthStoreFromMessage depthStoreHandle streamMessage
             updateWalletNotifier walletNotifierHandle streamMessage
 
-waitForCallResultWithTimeout :: Handle -> (StreamMessage -> Maybe a) -> IO a
+waitForCallResultWithTimeout :: Handle -> (StreamMessage -> Maybe a) -> IO ([StreamMessage], a)
 waitForCallResultWithTimeout h parser =
-    wrapInTimeout h "Call result was not returned in time." go
+    wrapInTimeout h "Call result was not returned in time." (go [])
   where
-    go = do
+    go buffer = do
         msg <- readNextStreamMessageWithTimeout h
         case msg of
             CallResult {} ->
                 case parser msg of
-                    Just result -> return result
+                    Just result -> return (reverse buffer, result)
                     Nothing ->
                         throw $ userError "Unexpected call result was returned."
-            _ -> go
+            other -> go (other:buffer)
 
 waitForSubscribesWithTimeout :: Handle -> IO [StreamMessage]
 waitForSubscribesWithTimeout h =
@@ -143,10 +150,14 @@ waitForSubscribesWithTimeout h =
             then return $ reverse msgs'
             else go msgs'
 
-initMtGoxStream :: MtGoxCredentials -> MtGoxAPIHandles -> IO ThreadId
-initMtGoxStream mtgoxCreds mtgoxAPIHandles =
+-- | Starts a thread that will connect to the data stream
+-- from Mt. Gox and supply the received data to the handles that are
+-- are passed in. A watchdog maintains the connection.
+initMtGoxStream :: MtGoxCredentials-> FullDepthSetting -> MtGoxAPIHandles -> IO ThreadId
+initMtGoxStream mtgoxCreds fullDepthSetting mtgoxAPIHandles =
     let task = openConnection mtGoxStreamHost mtGoxStreamPort
-                                    mtgoxCreds mtgoxAPIHandles
+                                    mtgoxCreds fullDepthSetting
+                                    mtgoxAPIHandles
         watchdogConf = do
             setResetDuration $ 90 * 10 ^ (6 :: Integer)
             case mtgoxLogger mtgoxAPIHandles of

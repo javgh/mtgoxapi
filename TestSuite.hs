@@ -84,6 +84,6 @@ tests = depthStoreTests
 
 main :: IO ()
 main = do
-    apiData <- initMtGoxAPI (Just silentLogger) debugCredentials
+    apiData <- initMtGoxAPI (Just silentLogger) debugCredentials SkipFullDepth
     let apiTests = map ($ apiData) mtgoxAPITests
     defaultMain $ apiTests ++ tests

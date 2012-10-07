@@ -2,6 +2,7 @@
 module Network.MtGoxAPI.Types
     ( parseStreamLine
     , StreamMessage(..)
+    , FullDepthSetting(..)
     , DepthType(..)
     , WalletOperationType(..)
     , IDKey(..)
@@ -45,6 +46,10 @@ data WalletOperationType = BTCDeposit
                          | BTCOut
                          | USDFee
                          deriving (Eq, Show)
+
+data FullDepthSetting = RequestFullDepth
+                      | SkipFullDepth
+                      deriving (Show)
 
 data StreamMessage = TickerUpdateUSD { tuBid :: Integer
                                      , tuAsk :: Integer
