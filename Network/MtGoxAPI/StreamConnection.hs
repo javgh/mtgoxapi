@@ -4,6 +4,8 @@ module Network.MtGoxAPI.StreamConnection
     , mtGoxTickerChannel
     , mtGoxDepthChannel
     , mtGoxTradeChannel
+    , MtGoxStreamSettings(..)
+    , WalletNotifierSetting(..)
     , FullDepthSetting(..)
     ) where
 
@@ -66,8 +68,8 @@ sendStreamCommand h creds cmd = do
     encodedCmd <- encodeStreamCommand cmd creds
     BL.hPutStr h encodedCmd >> B.hPutStr h "\n"
 
-openConnection :: HostName-> PortID-> MtGoxCredentials-> FullDepthSetting-> MtGoxAPIHandles-> IO (Either String ())
-openConnection host port creds fullDepthSetting apiHandles = do
+openConnection :: HostName-> PortID-> MtGoxCredentials-> MtGoxStreamSettings-> MtGoxAPIHandles-> IO (Either String ())
+openConnection host port creds streamSettings apiHandles = do
     status <- try go :: IO (Either IOException (Either String ()))
     case status of
         Right result -> return result
@@ -83,21 +85,27 @@ openConnection host port creds fullDepthSetting apiHandles = do
         _ <- waitForSubscribesWithTimeout h
         sendStreamCommand h creds $ UnsubscribeCmd mtGoxTradeChannel
 
-        -- get idkey and subscribe to wallet operations channel
-        sendStreamCommand h creds IDKeyCmd
-        (buffer1, idKey) <- waitForCallResultWithTimeout h parseIDKeyCallResult
-        sendStreamCommand h creds $ PrivateSubscribeCmd (idkKey idKey)
-
         -- prepare handles
         let tickerMonitorHandle = mtgoxTickerMonitorHandle apiHandles
             depthStoreHandle = mtgoxDepthStoreHandle apiHandles
             walletNotifierHandle = mtgoxWalletNotifierHandle apiHandles
 
-        -- rewind buffer
-        forM_ buffer1 $ \streamMessage -> do
-            updateTickerStatus tickerMonitorHandle streamMessage
-            updateDepthStoreFromMessage depthStoreHandle streamMessage
-            updateWalletNotifier walletNotifierHandle streamMessage
+        -- extract extra settings
+        let (MtGoxStreamSettings walletNotifierSetting fullDepthSetting) =
+                streamSettings
+
+        -- wallet notifier step
+        when (walletNotifierSetting == EnableWalletNotifications) $ do
+            -- get idkey and subscribe to wallet operations channel
+            sendStreamCommand h creds IDKeyCmd
+            (buffer1, idKey) <- waitForCallResultWithTimeout h parseIDKeyCallResult
+            sendStreamCommand h creds $ PrivateSubscribeCmd (idkKey idKey)
+
+            -- rewind buffer
+            forM_ buffer1 $ \streamMessage -> do
+                updateTickerStatus tickerMonitorHandle streamMessage
+                updateDepthStoreFromMessage depthStoreHandle streamMessage
+                updateWalletNotifier walletNotifierHandle streamMessage
 
         -- full depth step
         case fullDepthSetting of
@@ -153,10 +161,10 @@ waitForSubscribesWithTimeout h =
 -- | Starts a thread that will connect to the data stream
 -- from Mt. Gox and supply the received data to the handles that are
 -- are passed in. A watchdog maintains the connection.
-initMtGoxStream :: MtGoxCredentials-> FullDepthSetting -> MtGoxAPIHandles -> IO ThreadId
-initMtGoxStream mtgoxCreds fullDepthSetting mtgoxAPIHandles =
+initMtGoxStream :: MtGoxCredentials-> MtGoxStreamSettings -> MtGoxAPIHandles -> IO ThreadId
+initMtGoxStream mtgoxCreds streamSettings mtgoxAPIHandles =
     let task = openConnection mtGoxStreamHost mtGoxStreamPort
-                                    mtgoxCreds fullDepthSetting
+                                    mtgoxCreds streamSettings
                                     mtgoxAPIHandles
         watchdogConf = do
             setResetDuration $ 90 * 10 ^ (6 :: Integer)

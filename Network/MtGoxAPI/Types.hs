@@ -2,6 +2,8 @@
 module Network.MtGoxAPI.Types
     ( parseStreamLine
     , StreamMessage(..)
+    , MtGoxStreamSettings(..)
+    , WalletNotifierSetting(..)
     , FullDepthSetting(..)
     , DepthType(..)
     , WalletOperationType(..)
@@ -46,6 +48,14 @@ data WalletOperationType = BTCDeposit
                          | BTCOut
                          | USDFee
                          deriving (Eq, Show)
+
+data MtGoxStreamSettings = MtGoxStreamSettings WalletNotifierSetting
+                                                    FullDepthSetting
+                          deriving (Show)
+
+data WalletNotifierSetting = EnableWalletNotifications
+                           | DisableWalletNotifications
+                           deriving (Eq, Show)
 
 data FullDepthSetting = RequestFullDepth
                       | SkipFullDepth

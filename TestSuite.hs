@@ -84,6 +84,8 @@ tests = depthStoreTests
 
 main :: IO ()
 main = do
-    apiData <- initMtGoxAPI (Just silentLogger) debugCredentials SkipFullDepth
+    let streamSettings =
+            MtGoxStreamSettings DisableWalletNotifications SkipFullDepth
+    apiData <- initMtGoxAPI (Just silentLogger) debugCredentials streamSettings
     let apiTests = map ($ apiData) mtgoxAPITests
     defaultMain $ apiTests ++ tests
