@@ -9,6 +9,7 @@ module Network.MtGoxAPI.DepthStore
     , simulateUSDSell
     , DepthStoreHandle
     , DepthStoreType(..)
+    , DepthStoreAnswer(..)
 #if !PRODUCTION
     , simulateBTC
     , simulateUSD
@@ -43,6 +44,10 @@ instance I.Indexable DepthStoreEntry
     empty = I.ixSet [ I.ixFun $ \e -> [ dsePrice e ]
                     , I.ixFun $ \e -> [ dseTimestamp e ]
                     ]
+
+data DepthStoreAnswer = DepthStoreAnswer Integer
+                      | NotEnoughDepth
+                      | DepthStoreUnavailable
 
 data DepthStoreType = DepthStoreAsk | DepthStoreBid
                       deriving (Show)
@@ -108,7 +113,7 @@ isDataFresh (DepthStoreHandle dsdMVar) = do
             then Left "Depth store data is stale"
             else Right ()
 
-repeatSimulation :: DepthStoreHandle -> IO a -> IO (Maybe a)
+repeatSimulation :: DepthStoreHandle -> IO (Maybe Integer) -> IO DepthStoreAnswer
 repeatSimulation handle simulationAction = do
     let task = do
             isFresh <- isDataFresh handle
@@ -119,21 +124,19 @@ repeatSimulation handle simulationAction = do
                 setLoggingAction silentLogger
                 watchImpatiently task
     return $ case result of
-        Left _ -> Nothing
-        Right v -> Just v
-
-collapseErrors :: Maybe (Maybe a) -> Maybe a
-collapseErrors (Just (Just v)) = Just v
-collapseErrors (Just Nothing) = Nothing
-collapseErrors Nothing = Nothing
+        Left _ -> DepthStoreUnavailable
+        Right v -> case v of
+            Just v' -> DepthStoreAnswer v'
+            Nothing -> NotEnoughDepth
 
 -- | Simulate how much USD can be earned by selling the specified amount of BTC.
--- The function will return 'Nothing' in case there is not enough depth to cover
--- the full amount or - more likely - no recent data is available. In the latter
--- case it will have retried a few times before giving up.
-simulateBTCSell :: DepthStoreHandle -> Integer -> IO (Maybe Integer)
+-- The function will return 'NotEnoughDepth' in case there is not enough depth
+-- to cover the full amount. If not recent data is available, it will return
+-- 'DepthStoreUnavailable'. In the latter case it will have retried a few times
+-- before giving up.
+simulateBTCSell :: DepthStoreHandle -> Integer -> IO DepthStoreAnswer
 simulateBTCSell handle@(DepthStoreHandle dsdMVar) amount =
-    collapseErrors <$> repeatSimulation handle simulation
+    repeatSimulation handle simulation
   where
     simulation = do
         dsd <- readMVar dsdMVar
@@ -141,9 +144,9 @@ simulateBTCSell handle@(DepthStoreHandle dsdMVar) amount =
         return $ simulateBTC amount bids
 
 -- | Similar to 'simulateBTCSell'.
-simulateBTCBuy :: DepthStoreHandle -> Integer -> IO (Maybe Integer)
+simulateBTCBuy :: DepthStoreHandle -> Integer -> IO DepthStoreAnswer
 simulateBTCBuy handle@(DepthStoreHandle dsdMVar) amount =
-    collapseErrors <$> repeatSimulation handle simulation
+    repeatSimulation handle simulation
   where
     simulation = do
         dsd <- readMVar dsdMVar
@@ -151,9 +154,9 @@ simulateBTCBuy handle@(DepthStoreHandle dsdMVar) amount =
         return $ simulateBTC amount asks
 
 -- | Similar to 'simulateBTCSell'.
-simulateUSDSell :: DepthStoreHandle -> Integer -> IO (Maybe Integer)
+simulateUSDSell :: DepthStoreHandle -> Integer -> IO DepthStoreAnswer
 simulateUSDSell handle@(DepthStoreHandle dsdMVar) usdAmount =
-    collapseErrors <$> repeatSimulation handle simulation
+    repeatSimulation handle simulation
   where
     simulation = do
         dsd <- readMVar dsdMVar

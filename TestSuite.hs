@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import Control.Applicative
 import Control.Error
 import Control.Monad.IO.Class
 import Test.Framework
@@ -44,30 +45,30 @@ test5 :: MtGoxAPIHandles -> Test
 test5 apiData = testCase "simulateBTCSell returns non-zero amount" $ do
     r <- simulateBTCSell (mtgoxDepthStoreHandle apiData) 1000000
     case r of
-        Nothing -> assertFailure "Simulation did not return any data."
-        Just v -> assertBool "value is zero" (v /= 0)
+        DepthStoreAnswer v -> assertBool "value is zero" (v /= 0)
+        _ -> assertFailure "Simulation did not return any data."
 
 test6 :: MtGoxAPIHandles -> Test
 test6 apiData = testCase "simulateBTCBuy returns non-zero amount" $ do
     r <- simulateBTCBuy (mtgoxDepthStoreHandle apiData) 1000000
     case r of
-        Nothing -> assertFailure "Simulation did not return any data."
-        Just v -> assertBool "value is zero" (v /= 0)
+        DepthStoreAnswer v -> assertBool "value is zero" (v /= 0)
+        _ -> assertFailure "Simulation did not return any data."
 
 test7 :: MtGoxAPIHandles -> Test
 test7 apiData = testCase "simulateUSDSell returns non-zero amount" $ do
     r <- simulateUSDSell (mtgoxDepthStoreHandle apiData) 1000
     case r of
-        Nothing -> assertFailure "Simulation did not return any data."
-        Just v -> assertBool "value is zero" (v /= 0)
+        DepthStoreAnswer v -> assertBool "value is zero" (v /= 0)
+        _ -> assertFailure "Simulation did not return any data."
 
 test8 :: MtGoxAPIHandles -> Test
 test8 apiData = testCase "two simulations mostly match" $ do
     let startValue = 1000000
     m <- runMaybeT $ do
-        usdValue <- MaybeT $ simulateBTCBuy
+        usdValue <- MaybeT $ toMaybe <$> simulateBTCBuy
                                 (mtgoxDepthStoreHandle apiData) startValue
-        btcValue <- MaybeT $ simulateUSDSell
+        btcValue <- MaybeT $ toMaybe <$> simulateUSDSell
                                 (mtgoxDepthStoreHandle apiData) usdValue
         let diff = abs (startValue - btcValue)
         liftIO $ assertBool "values differ more than 0.0001 BTC"
@@ -75,6 +76,9 @@ test8 apiData = testCase "two simulations mostly match" $ do
     case m of
         Nothing -> assertFailure "Simulation did not return any data."
         Just _ -> return ()
+  where
+    toMaybe (DepthStoreAnswer v) = Just v
+    toMaybe _ = Nothing
 
 mtgoxAPITests ::  [MtGoxAPIHandles -> Test]
 mtgoxAPITests = [test1, test2, test3, test4, test5, test6, test7, test8]

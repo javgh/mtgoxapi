@@ -90,7 +90,7 @@ callApi curlHandle mtGoxCred uri parameters = do
             Right jsonV -> case fromJSON jsonV of
                 (Error err'') -> Left $ "API parse error: " ++ err''
                 (Success v) -> Right v :: Either String HttpApiResult
-        err -> Left $ "Curl error: " ++ show err
+        errMsg -> Left $ "Curl error: " ++ show errMsg
 
 compileRequest :: MtGoxCredentials -> [(String, String)] -> ([String], String)
 compileRequest credentials parameters =
@@ -123,7 +123,7 @@ submitBtcBuyOrder curlHandle mtGoxCreds amount = do
                      ]
     v <- callApi curlHandle mtGoxCreds uri parameters
     return $ case v of
-        Left err -> Left err
+        Left errMsg -> Left errMsg
         Right HttpApiFailure -> Left "HttpApiFailure when doing submitBtcBuyOrder"
         Right (HttpApiSuccess v') ->
             Right (parseReply "submitBtcBuyOrder" v') :: Either String Order
@@ -137,7 +137,7 @@ submitBtcSellOrder curlHandle mtGoxCreds amount = do
                      ]
     v <- callApi curlHandle mtGoxCreds uri parameters
     return $ case v of
-        Left err -> Left err
+        Left errMsg -> Left errMsg
         Right HttpApiFailure -> Left "HttpApiFailure when doing submitBtcBuyOrder"
         Right (HttpApiSuccess v') ->
             Right (parseReply "submitBtcSellOrder" v') :: Either String Order
@@ -215,7 +215,7 @@ withdrawBitcoins curlHandle mtGoxCreds (BitcoinAddress addr) amount = do
                     (Error err'') ->
                         Left $ "API parse error when calling old API: " ++ err''
                     (Success v) -> Right v :: Either String WithdrawStatus
-            err -> Left $ "Curl error: " ++ show err
+            errMsg -> Left $ "Curl error: " ++ show errMsg
 
 letOrdersExecuteR :: Maybe WatchdogLogger-> CurlHandle  -> MtGoxCredentials -> IO (Maybe OpenOrderCount)
 letOrdersExecuteR mLogger curlHandle mtGoxCreds =

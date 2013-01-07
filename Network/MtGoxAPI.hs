@@ -12,6 +12,7 @@ module Network.MtGoxAPI
     , module Network.MtGoxAPI.Handles
     , module Control.Watchdog
     , TickerStatus(..)
+    , DepthStoreAnswer(..)
     , module Network.MtGoxAPI.Types
     ) where
 
