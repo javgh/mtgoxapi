@@ -177,7 +177,7 @@ removeStaleEntries !store = do
         -- so that when the check fires, we have a bunch of stuff to remove at
         -- once.
         fastCutoffCheck = addUTCTime intervalToRemove cutoff
-    if null (I.toList (store @< fastCutoffCheck))
+    if I.null (store @< fastCutoffCheck)
         then return store
         else return $ store @>= cutoff
 
