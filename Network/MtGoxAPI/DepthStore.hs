@@ -7,6 +7,7 @@ module Network.MtGoxAPI.DepthStore
     , simulateBTCSell
     , simulateBTCBuy
     , simulateUSDSell
+    , simulateUSDBuy
     , DepthStoreHandle
     , DepthStoreType(..)
     , DepthStoreAnswer(..)
@@ -143,7 +144,8 @@ simulateBTCSell handle@(DepthStoreHandle dsdMVar) amount =
         let bids = I.toDescList (I.Proxy :: I.Proxy Integer) $ dsdBidStore dsd
         return $ simulateBTC amount bids
 
--- | Similar to 'simulateBTCSell'.
+-- | Simulate how much USD will be needed to buy the specified amount of BTC.
+-- See 'simulateBTCSell' for more details.
 simulateBTCBuy :: DepthStoreHandle -> Integer -> IO DepthStoreAnswer
 simulateBTCBuy handle@(DepthStoreHandle dsdMVar) amount =
     repeatSimulation handle simulation
@@ -153,7 +155,8 @@ simulateBTCBuy handle@(DepthStoreHandle dsdMVar) amount =
         let asks = I.toAscList (I.Proxy :: I.Proxy Integer) $ dsdAskStore dsd
         return $ simulateBTC amount asks
 
--- | Similar to 'simulateBTCSell'.
+-- | Simulate how much BTC can be earned by selling the specified amount of USD.
+-- See 'simulateBTCSell' for more details.
 simulateUSDSell :: DepthStoreHandle -> Integer -> IO DepthStoreAnswer
 simulateUSDSell handle@(DepthStoreHandle dsdMVar) usdAmount =
     repeatSimulation handle simulation
@@ -162,6 +165,17 @@ simulateUSDSell handle@(DepthStoreHandle dsdMVar) usdAmount =
         dsd <- readMVar dsdMVar
         let asks = I.toAscList (I.Proxy :: I.Proxy Integer) $ dsdAskStore dsd
         return $ simulateUSD usdAmount asks
+
+-- | Simulate how much BTC will be needed to buy the specified amount of USD.
+-- See 'simulateBTCSell' for more details.
+simulateUSDBuy :: DepthStoreHandle -> Integer -> IO DepthStoreAnswer
+simulateUSDBuy handle@(DepthStoreHandle dsdMVar) usdAmount =
+    repeatSimulation handle simulation
+  where
+    simulation = do
+        dsd <- readMVar dsdMVar
+        let bids = I.toDescList (I.Proxy :: I.Proxy Integer) $ dsdBidStore dsd
+        return $ simulateUSD usdAmount bids
 
 updateStore :: I.IxSet DepthStoreEntry-> Integer -> Integer -> UTCTime -> I.IxSet DepthStoreEntry
 updateStore !store amount price timestamp =

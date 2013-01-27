@@ -4,6 +4,7 @@ module Network.MtGoxAPI
     , simulateBTCSell
     , simulateBTCBuy
     , simulateUSDSell
+    , simulateUSDBuy
     , waitForBTCDeposit
     , callHTTPApi
     , callHTTPApi'

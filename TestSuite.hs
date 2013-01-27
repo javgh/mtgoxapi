@@ -63,7 +63,14 @@ test7 apiData = testCase "simulateUSDSell returns non-zero amount" $ do
         _ -> assertFailure "Simulation did not return any data."
 
 test8 :: MtGoxAPIHandles -> Test
-test8 apiData = testCase "two simulations mostly match" $ do
+test8 apiData = testCase "simulateUSDBuy returns non-zero amount" $ do
+    r <- simulateUSDBuy (mtgoxDepthStoreHandle apiData) 1000
+    case r of
+        DepthStoreAnswer v -> assertBool "value is zero" (v /= 0)
+        _ -> assertFailure "Simulation did not return any data."
+
+test9 :: MtGoxAPIHandles -> Test
+test9 apiData = testCase "two simulations mostly match" $ do
     let startValue = 1000000
     m <- runMaybeT $ do
         usdValue <- MaybeT $ toMaybe <$> simulateBTCBuy
@@ -80,8 +87,27 @@ test8 apiData = testCase "two simulations mostly match" $ do
     toMaybe (DepthStoreAnswer v) = Just v
     toMaybe _ = Nothing
 
+test10 :: MtGoxAPIHandles -> Test
+test10 apiData = testCase "another two simulations mostly match" $ do
+    let startValue = 1000000
+    m <- runMaybeT $ do
+        usdValue <- MaybeT $ toMaybe <$> simulateBTCSell
+                                (mtgoxDepthStoreHandle apiData) startValue
+        btcValue <- MaybeT $ toMaybe <$> simulateUSDBuy
+                                (mtgoxDepthStoreHandle apiData) usdValue
+        let diff = abs (startValue - btcValue)
+        liftIO $ assertBool "values differ more than 0.0001 BTC"
+                    (diff <= 10000)
+    case m of
+        Nothing -> assertFailure "Simulation did not return any data."
+        Just _ -> return ()
+  where
+    toMaybe (DepthStoreAnswer v) = Just v
+    toMaybe _ = Nothing
+
 mtgoxAPITests ::  [MtGoxAPIHandles -> Test]
-mtgoxAPITests = [test1, test2, test3, test4, test5, test6, test7, test8]
+mtgoxAPITests = [ test1, test2, test3, test4, test5
+                , test6, test7, test8, test9, test10]
 
 tests :: [Test]
 tests = depthStoreTests
