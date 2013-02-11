@@ -20,7 +20,7 @@ module Network.MtGoxAPI.Types
     , PrivateInfo(..)
     , BitcoinDepositAddress(..)
     , BitcoinAddress(..)
-    , WithdrawStatus(..)
+    , WithdrawResult(..)
     , WalletEntry(..)
     ) where
 
@@ -137,11 +137,8 @@ data BitcoinAddress = BitcoinAddress { baAddress :: T.Text }
 data BitcoinDepositAddress = BitcoinDepositAddress { bdaAddr :: BitcoinAddress }
                              deriving (Show)
 
-data WithdrawStatus = WithdrawStatus { wsInfo :: T.Text
-                                     , wsReference :: T.Text
-                                     }
+data WithdrawResult = WithdrawResult { wsTxID :: T.Text }
                       deriving (Show)
-
 
 instance FromJSON StreamMessage
   where
@@ -398,12 +395,7 @@ instance FromJSON BitcoinDepositAddress
     parseJSON (Object o) = BitcoinDepositAddress <$> o .: "addr"
     parseJSON _ = mzero
 
-instance FromJSON WithdrawStatus
+instance FromJSON WithdrawResult
   where
-    parseJSON (Object o) = do
-        status <- o .: "status"
-        reference <- o .: "reference"
-        if "are on their way" `T.isInfixOf` status
-            then return $ WithdrawStatus status reference
-            else mzero
+    parseJSON (Object o) = WithdrawResult <$> o .: "trx"
     parseJSON _ = mzero

@@ -22,7 +22,6 @@ import Data.Aeson
 import Data.Digest.Pure.SHA
 import Network.Curl
 import Network.HTTP.Base (urlEncodeVars)
-import Text.Printf
 
 import qualified Data.Attoparsec as AP
 import qualified Data.ByteString as B
@@ -111,7 +110,7 @@ getOrderCountR mLogger curlHandle mtGoxCreds = do
     v <- reliableApiCall mLogger $ callApi curlHandle mtGoxCreds uri []
     return $ case v of
         HttpApiFailure -> Nothing
-        HttpApiSuccess v' -> 
+        HttpApiSuccess v' ->
             Just (parseReply "getOrderCountR" v') :: Maybe OpenOrderCount
 
 submitBtcBuyOrder :: CurlHandle  -> MtGoxCredentials -> Integer -> IO (Either String Order)
@@ -186,36 +185,19 @@ getBitcoinDepositAddressR mLogger curlHandle mtGoxCreds = do
         HttpApiSuccess v' -> 
             Just (parseReply "getBitcoinDepositAddressR" v') :: Maybe BitcoinDepositAddress
 
-withdrawBitcoins :: CurlHandle -> MtGoxCredentials-> BitcoinAddress-> Integer-> IO (Either String WithdrawStatus)
+withdrawBitcoins :: CurlHandle -> MtGoxCredentials-> BitcoinAddress-> Integer-> IO (Either String WithdrawResult)
 withdrawBitcoins curlHandle mtGoxCreds (BitcoinAddress addr) amount = do
-    let factor = 10 ^ (8 :: Integer)
-        doubleAmount = fromIntegral amount / factor
-        uri = mtGoxApi ++ "0/withdraw.php"
-        parameters = [ ("group1", "BTC")
-                     , ("btca", T.unpack addr)
-                     , ("amount", printf "%.8f" (doubleAmount :: Double))
+    let uri = mtGoxApi ++ "1/generic/bitcoin/send_simple"
+        parameters = [ ("address", T.unpack addr)
+                     , ("amount_int", show amount)
                      ]
-    customCallApi uri parameters
-  where
-    customCallApi uri parameters = do   -- needed for accessing version 0 API,
-                                        -- as this functionality is not (yet?)
-                                        -- available in version 1
-        nonce <- getNonce
-        let parameters' = ("nonce", T.unpack nonce) : parameters
-            (headers, body) = compileRequest mtGoxCreds parameters'
-        (status, payload) <- performCurlRequest curlHandle uri
-                                [ CurlHttpHeaders headers
-                                , CurlPostFields [body]
-                                ]
-        return $ case status of
-            CurlOK -> case AP.parseOnly json (B8.pack payload) of
-                Left err' ->
-                    Left $ "JSON parse error when calling old API: " ++ err'
-                Right jsonV -> case fromJSON jsonV of
-                    (Error err'') ->
-                        Left $ "API parse error when calling old API: " ++ err''
-                    (Success v) -> Right v :: Either String WithdrawStatus
-            errMsg -> Left $ "Curl error: " ++ show errMsg
+    v <- callApi curlHandle mtGoxCreds uri parameters
+    print v
+    return $ case v of
+        Left errMsg -> Left errMsg
+        Right HttpApiFailure -> Left "HttpApiFailure when doing withdrawBitcoins"
+        Right (HttpApiSuccess v') ->
+            Right (parseReply "withdrawBitcoins" v') :: Either String WithdrawResult
 
 letOrdersExecuteR :: Maybe WatchdogLogger-> CurlHandle  -> MtGoxCredentials -> IO (Maybe OpenOrderCount)
 letOrdersExecuteR mLogger curlHandle mtGoxCreds =
