@@ -2,12 +2,14 @@ module Network.MtGoxAPI.DepthStore.Tests
     ( depthStoreTests
     ) where
 
+import Control.Monad
 import Data.Maybe
 import Data.Time.Clock
 import Data.Typeable
 import Test.Framework
 import Test.Framework.Providers.QuickCheck2
 import Test.QuickCheck
+import Test.QuickCheck.Monadic
 
 import qualified Data.IxSet as I
 
@@ -17,12 +19,26 @@ import Network.MtGoxAPI.DepthStore
 newtype ArbDepthStoreEntry = ArbDepthStoreEntry { unADSE :: DepthStoreEntry }
                              deriving (Show)
 
+data MockupDepthStoreUpdate = MockupDepthStoreUpdate
+                                { _mdsuType :: DepthStoreType
+                                , _mdsuAmount :: Integer
+                                , _msduPrice :: Integer
+                                }
+                              deriving (Show)
+
 instance Arbitrary ArbDepthStoreEntry where
     arbitrary = do
         let timestamp = read "2012-06-25 00:00:00 UTC" :: UTCTime
         amount <- choose (1 * 10^(8::Integer), 10 * 10^(8::Integer))
         price <- choose (1 * 10^(5::Integer), 8 * 10^(5::Integer))
         return $ ArbDepthStoreEntry (DepthStoreEntry amount price timestamp)
+
+instance Arbitrary MockupDepthStoreUpdate where
+    arbitrary = do
+        t <- elements [DepthStoreAsk, DepthStoreBid]
+        amount <- choose (1 * 10^(8::Integer), 10 * 10^(8::Integer))
+        price <- choose (1 * 10^(5::Integer), 8 * 10^(5::Integer))
+        return $ MockupDepthStoreUpdate t amount price
 
 returnDescending :: (I.Indexable a, Typeable a, Ord a) => [a] -> [a]
 returnDescending entries =
@@ -62,8 +78,50 @@ checkTotalPriceIsHigherOrEqual :: Ord a => Maybe a -> Maybe a -> Bool
 checkTotalPriceIsHigherOrEqual (Just a) (Just b) = a >= b
 checkTotalPriceIsHigherOrEqual _ _ = False
 
+btcTradeCycleConsistency :: NonEmptyList MockupDepthStoreUpdate-> NonNegative Integer -> Property
+btcTradeCycleConsistency (NonEmpty updates) (NonNegative amount) =
+    tradeCycleConsistency simulateBTCSell simulateUSDSell (<=) updates amount
+
+btcTradeCycleConsistency' :: NonEmptyList MockupDepthStoreUpdate-> NonNegative Integer -> Property
+btcTradeCycleConsistency' (NonEmpty updates) (NonNegative amount) =
+    tradeCycleConsistency simulateBTCBuy simulateUSDBuy (>=) updates amount
+
+usdTradeCycleConsistency :: NonEmptyList MockupDepthStoreUpdate-> NonNegative Integer -> Property
+usdTradeCycleConsistency (NonEmpty updates) (NonNegative amount) =
+    tradeCycleConsistency simulateUSDSell simulateBTCSell (<=) updates amount
+
+usdTradeCycleConsistency' :: NonEmptyList MockupDepthStoreUpdate-> NonNegative Integer -> Property
+usdTradeCycleConsistency' (NonEmpty updates) (NonNegative amount) =
+    tradeCycleConsistency simulateUSDBuy simulateBTCBuy (>=) updates amount
+
+tradeCycleConsistency :: Num a =>(DepthStoreHandle -> a -> IO DepthStoreAnswer)-> (DepthStoreHandle -> Integer -> IO DepthStoreAnswer)-> (Integer -> a -> Bool)-> [MockupDepthStoreUpdate]-> a-> Property
+tradeCycleConsistency firstSell secondSell cmpr updates centAmount = monadicIO $ do
+    check <- run $ do
+        let btcAmount = centAmount * 10 ^ (6 :: Integer)
+        handle <- initDepthStore
+        setHasFullDepth handle
+        forM_ updates $
+            \(MockupDepthStoreUpdate t amount price) ->
+                updateDepthStore handle t amount price
+        usdAmountM <- firstSell handle btcAmount
+        case usdAmountM of
+            DepthStoreUnavailable -> return False
+            NotEnoughDepth -> return True
+            DepthStoreAnswer usdAmount -> do
+                btcAmount'M <- secondSell handle usdAmount
+                case btcAmount'M of
+                    DepthStoreUnavailable -> return False
+                    NotEnoughDepth -> return True
+                    DepthStoreAnswer btcAmount' ->
+                        return (btcAmount' `cmpr` btcAmount)
+    assert check
+
 depthStoreTests :: [Test]
 depthStoreTests = [ testProperty "zero amount always ok" propZeroAmountAlwaysOk
                   , testProperty "lower amount always ok" propLowerAmountAlwaysOk
                   , testProperty "selling and buying matches" propSellingAndBuyingMatches
+                  , testProperty "selling BTC and buying it back yields no profit" btcTradeCycleConsistency
+                  , testProperty "selling USD and buying it back yields no profit" usdTradeCycleConsistency
+                  , testProperty "buying BTC in a roundabout way is not cheaper" btcTradeCycleConsistency'
+                  , testProperty "buying USD in a roundabout way is not cheaper" usdTradeCycleConsistency'
                   ]

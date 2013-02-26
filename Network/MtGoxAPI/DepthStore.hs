@@ -21,7 +21,7 @@ module Network.MtGoxAPI.DepthStore
 import Control.Applicative
 import Control.Concurrent
 import Control.Watchdog
-import Data.IxSet((@<), (@>=))
+import Data.IxSet((@<), (@>), (@>=), (@<=))
 import Data.Time.Clock
 import Data.Typeable
 
@@ -49,6 +49,7 @@ instance I.Indexable DepthStoreEntry
 data DepthStoreAnswer = DepthStoreAnswer Integer
                       | NotEnoughDepth
                       | DepthStoreUnavailable
+                      deriving (Show)
 
 data DepthStoreType = DepthStoreAsk | DepthStoreBid
                       deriving (Show)
@@ -91,11 +92,17 @@ updateDepthStore (DepthStoreHandle dsdMVar) t amount price = do
     let (askStore'', bidStore'') =
             case t of
                 DepthStoreAsk ->
-                    (updateStore askStore' amount price timestamp, bidStore')
+                    (askStore', removeConflictingBidEntries bidStore' price)
                 DepthStoreBid ->
-                    (askStore', updateStore bidStore' amount price timestamp)
-    _ <- swapMVar dsdMVar dsd { dsdAskStore = askStore''
-                              , dsdBidStore = bidStore''
+                    (removeConflictingAskEntries askStore' price, bidStore')
+    let (askStore''', bidStore''') =
+            case t of
+                DepthStoreAsk ->
+                    (updateStore askStore'' amount price timestamp, bidStore'')
+                DepthStoreBid ->
+                    (askStore'', updateStore bidStore'' amount price timestamp)
+    _ <- swapMVar dsdMVar dsd { dsdAskStore = askStore'''
+                              , dsdBidStore = bidStore'''
                               , dsdLastUpdate = Just timestamp
                               }
     return ()
@@ -197,6 +204,23 @@ removeStaleEntries !store = do
     if I.null (store @< fastCutoffCheck)
         then return store
         else return $ store @>= cutoff
+
+
+-- | Keep internal consistency, by removing bids that a higher than
+-- the new ask, which means they must have already been filled.
+removeConflictingBidEntries :: (Ord a, Typeable k, Typeable a, I.Indexable a) =>I.IxSet a -> k -> I.IxSet a
+removeConflictingBidEntries !bidStore askPrice =
+    if I.null (bidStore @>= askPrice)
+        then bidStore
+        else bidStore @< askPrice
+
+-- | Keep internal consistency, by removing asks that a lower than
+-- the new bid, which means they must have already been filled.
+removeConflictingAskEntries :: (Ord a, Typeable k, Typeable a, I.Indexable a) =>I.IxSet a -> k -> I.IxSet a
+removeConflictingAskEntries !askStore bidPrice =
+    if I.null (askStore @<= bidPrice)
+        then askStore
+        else askStore @> bidPrice
 
 simulateBTC :: Integer -> [DepthStoreEntry] -> Maybe Integer
 simulateBTC 0 _ = Just 0

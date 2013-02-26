@@ -1,0 +1,4 @@
+:set -i.
+:set -XOverloadedStrings
+-- :set -Wall
+:set -fwarn-unused-imports
