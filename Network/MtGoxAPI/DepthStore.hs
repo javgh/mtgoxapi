@@ -34,6 +34,19 @@ intervalToRemove :: NominalDiffTime
 intervalToRemove = -1 * 60          -- remove in blocks of these, so we do
                                     -- not have to do it as often
 
+noActivityDetectionInterval :: NominalDiffTime
+noActivityDetectionInterval = 180   -- declare Depth store out of date,
+                                    -- if we do not see activity for these
+                                    -- number of seconds
+
+watchdogSettings :: WatchdogAction ()
+watchdogSettings = do
+    setLoggingAction silentLogger
+    setInitialDelay $ 250000    -- 250 ms
+    setMaximumRetries 6
+    -- will fail after:
+    -- 0.25 + 0.5 + 1 + 2 + 4 + 8 seconds = 15.75 seconds
+
 data DepthStoreEntry = DepthStoreEntry { dseAmount :: Integer
                                        , dsePrice :: Integer
                                        , dseTimestamp :: UTCTime
@@ -117,7 +130,7 @@ isDataFresh (DepthStoreHandle dsdMVar) = do
     decide True Nothing _ = Left "Depth store is still empty."
     decide True (Just timestamp) now =
         let age = diffUTCTime now timestamp
-        in if age > 180
+        in if age > noActivityDetectionInterval
             then Left "Depth store data is stale"
             else Right ()
 
@@ -129,7 +142,7 @@ repeatSimulation handle simulationAction = do
                 Left msg -> return $ Left msg
                 Right _ -> Right <$> simulationAction
     result <- watchdog $ do
-                setLoggingAction silentLogger
+                watchdogSettings
                 watchImpatiently task
     return $ case result of
         Left _ -> DepthStoreUnavailable
@@ -141,7 +154,8 @@ repeatSimulation handle simulationAction = do
 -- The function will return 'NotEnoughDepth' in case there is not enough depth
 -- to cover the full amount. If not recent data is available, it will return
 -- 'DepthStoreUnavailable'. In the latter case it will have retried a few times
--- before giving up.
+-- before giving up. The function will not block for longer than about 20
+-- seconds.
 simulateBTCSell :: DepthStoreHandle -> Integer -> IO DepthStoreAnswer
 simulateBTCSell handle@(DepthStoreHandle dsdMVar) amount =
     repeatSimulation handle simulation
