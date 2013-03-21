@@ -28,16 +28,30 @@ data TickerStatus = TickerStatus { tsTimestamp :: UTCTime
 expectedPrecision :: Integer
 expectedPrecision = 5
 
--- | Access latest ticker status in a safe way (it will be checked, whether
--- fresh data is available).
+maximumAgeInSeconds :: NominalDiffTime
+maximumAgeInSeconds = 300
+
+watchdogSettings :: WatchdogAction ()
+watchdogSettings = do
+    setLoggingAction silentLogger
+    setInitialDelay 250000    -- 250 ms
+    setMaximumRetries 6
+    -- will fail after:
+    -- 0.25 + 0.5 + 1 + 2 + 4 + 8 seconds = 15.75 seconds
+
+-- | Access latest ticker status in a safe way. It will be checked, whether
+-- fresh data is available (never older than 300 seconds) and if not, re-try a
+-- few times before giving up. The function will not block for longer than
+-- about 20 seconds.
 getTickerStatus :: TickerMonitorHandle -> IO TickerStatus
-getTickerStatus TickerMonitorHandle { unTMH = store } =
+getTickerStatus TickerMonitorHandle { unTMH = store } = do
     let task = getTickerStatus' store
-    in watchdog $ do
-        setInitialDelay 200000 {- 200 ms -}
-        setMaximumDelay 200000000 {- 20 seconds -}
-        setLoggingAction silentLogger
-        watch task
+    result <- watchdog $ do
+                watchdogSettings
+                watchImpatiently task
+    return $ case result of
+                Left _ -> TickerUnavailable
+                Right status -> status
 
 getTickerStatus' :: MVar (Maybe TickerStatus) -> IO (Either String TickerStatus)
 getTickerStatus' store = do
@@ -47,12 +61,9 @@ getTickerStatus' store = do
         Just tickerStatus -> do
             now <- getCurrentTime
             let age = diffUTCTime now (tsTimestamp tickerStatus)
-            return $ decideOnAge age tickerStatus
-  where
-    decideOnAge age tickerStatus
-      | age < 60 = Right tickerStatus
-      | age >= 60 && age <= 300 = Left "Data stale"    -- will retry
-      | otherwise = Right TickerUnavailable            -- give up
+            return $ if age < maximumAgeInSeconds
+                        then Right tickerStatus
+                        else Left "Data stale"
 
 -- | Update ticker with new data.
 updateTickerStatus :: TickerMonitorHandle -> StreamMessage -> IO ()
