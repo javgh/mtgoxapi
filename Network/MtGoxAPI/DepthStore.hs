@@ -42,7 +42,7 @@ noActivityDetectionInterval = 180   -- declare Depth store out of date,
 watchdogSettings :: WatchdogAction ()
 watchdogSettings = do
     setLoggingAction silentLogger
-    setInitialDelay $ 250000    -- 250 ms
+    setInitialDelay 250000    -- 250 ms
     setMaximumRetries 6
     -- will fail after:
     -- 0.25 + 0.5 + 1 + 2 + 4 + 8 seconds = 15.75 seconds
