@@ -9,30 +9,31 @@ import Test.Framework.Providers.HUnit
 import Test.HUnit hiding (Test)
 
 import Network.MtGoxAPI
-import Network.MtGoxAPI.Handles
-import Network.MtGoxAPI.Credentials
 import Network.MtGoxAPI.DepthStore.Tests
+
+cent :: Integer
+cent = 1000000
 
 test1 :: MtGoxAPIHandles -> Test
 test1 apiData = testCase "getOrderCountR returns data" $ do
-    r <- callHTTPApi apiData getOrderCountR
+    r <- getOrderCountR apiData
     case r of
-        Just _ -> return ()
-        Nothing -> assertFailure "getOrderCountR did not return data."
+        Right _ -> return ()
+        Left _ -> assertFailure "getOrderCountR did not return data."
 
 test2 :: MtGoxAPIHandles -> Test
 test2 apiData = testCase "getPrivateInfoR returns data" $ do
-    r <- callHTTPApi apiData getPrivateInfoR
+    r <- getPrivateInfoR apiData
     case r of
-        Just _ -> return ()
-        Nothing -> assertFailure "getPrivateInfoR did not return data."
+        Right _ -> return ()
+        Left _ -> assertFailure "getPrivateInfoR did not return data."
 
 test3 :: MtGoxAPIHandles -> Test
 test3 apiData = testCase "getBitcoinDepositAddressR returns data" $ do
-    r <- callHTTPApi apiData getBitcoinDepositAddressR
+    r <- getBitcoinDepositAddressR apiData
     case r of
-        Just _ -> return ()
-        Nothing -> assertFailure "getBitcoinDepositAddressR did not return data."
+        Right _ -> return ()
+        Left _ -> assertFailure "getBitcoinDepositAddressR did not return data."
 
 test4 :: MtGoxAPIHandles -> Test
 test4 apiData = testCase "ticker is available" $ do
@@ -112,10 +113,20 @@ mtgoxAPITests = [ test1, test2, test3, test4, test5
 tests :: [Test]
 tests = depthStoreTests
 
-main :: IO ()
-main = do
+prepareAPI :: IO MtGoxAPIHandles
+prepareAPI =
     let streamSettings =
             MtGoxStreamSettings DisableWalletNotifications SkipFullDepth
-    apiData <- initMtGoxAPI (Just silentLogger) debugCredentials streamSettings
+    in initMtGoxAPI (Just silentLogger) debugCredentials streamSettings
+
+main :: IO ()
+main = do
+    apiData <- prepareAPI
     let apiTests = map ($ apiData) mtgoxAPITests
     defaultMain $ apiTests ++ tests
+
+manualSubmitOrderTest :: IO ()
+manualSubmitOrderTest = do
+    apiData <- prepareAPI
+    submitOrder apiData OrderTypeSellBTC cent >>= print
+    submitOrder apiData OrderTypeBuyBTC cent >>= print

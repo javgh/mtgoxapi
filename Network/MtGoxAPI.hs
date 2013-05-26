@@ -6,14 +6,17 @@ module Network.MtGoxAPI
     , simulateUSDSell
     , simulateUSDBuy
     , waitForBTCDeposit
-    , callHTTPApi
-    , callHTTPApi'
-    , module Network.MtGoxAPI.HttpAPI
+    , getOrderCountR
+    , getPrivateInfoR
+    , getBitcoinDepositAddressR
+    , withdrawBitcoins
+    , submitOrder
     , module Network.MtGoxAPI.Credentials
     , module Network.MtGoxAPI.Handles
     , module Control.Watchdog
     , TickerStatus(..)
     , DepthStoreAnswer(..)
+    , H.OrderStats(..)
     , module Network.MtGoxAPI.Types
     ) where
 
@@ -23,11 +26,12 @@ import Network.MtGoxAPI.Credentials
 import Network.MtGoxAPI.CurlWrapper
 import Network.MtGoxAPI.DepthStore
 import Network.MtGoxAPI.Handles
-import Network.MtGoxAPI.HttpAPI
 import Network.MtGoxAPI.StreamConnection
 import Network.MtGoxAPI.TickerMonitor
 import Network.MtGoxAPI.Types
 import Network.MtGoxAPI.WalletNotifier
+
+import qualified Network.MtGoxAPI.HttpAPI as H
 
 -- | Rolls all the individual init functions into one. Namely
 -- 'initTickerMonitor', 'initDepthStore', 'initCurlWrapper',
@@ -50,6 +54,26 @@ initMtGoxAPI mLogger mtgoxCreds mtgoxStreamSettings = do
                             }
     _ <- initMtGoxStream mtgoxCreds mtgoxStreamSettings mtgoxAPIHandles
     return mtgoxAPIHandles
+
+-- | Wrapper around 'H.getOrderCountR'
+getOrderCountR :: MtGoxAPIHandles -> IO (Either String OpenOrderCount)
+getOrderCountR apiData = callHTTPApi apiData H.getOrderCountR
+
+-- | Wrapper around 'H.getPrivateInfoR'
+getPrivateInfoR :: MtGoxAPIHandles -> IO (Either String PrivateInfo)
+getPrivateInfoR apiData = callHTTPApi apiData H.getPrivateInfoR
+
+-- | Wrapper around 'H.getBitcoinDepositAddressR'
+getBitcoinDepositAddressR :: MtGoxAPIHandles -> IO (Either String BitcoinDepositAddress)
+getBitcoinDepositAddressR apiData = callHTTPApi apiData H.getBitcoinDepositAddressR
+
+-- | Wrapper around 'H.withdrawBitcoins'
+withdrawBitcoins :: MtGoxAPIHandles-> BitcoinAddress -> Integer -> IO (Either String WithdrawResult)
+withdrawBitcoins apiData = callHTTPApi' apiData H.withdrawBitcoins
+
+-- | Wrapper around 'H.submitOrder'
+submitOrder :: MtGoxAPIHandles-> OrderType -> Integer -> IO (Either String H.OrderStats)
+submitOrder apiData = callHTTPApi apiData H.submitOrder
 
 -- | Helper function to call functions from 'Network.MtGoxAPI.HttpAPI'.
 callHTTPApi :: MtGoxAPIHandles-> (Maybe WatchdogLogger -> CurlHandle -> MtGoxCredentials -> t)-> t

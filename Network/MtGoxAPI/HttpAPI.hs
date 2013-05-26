@@ -1,3 +1,9 @@
+-- |
+-- Functions that are marked with the suffix 'R' retry automatically in case of
+-- failure up to a certain number of times. However, they will return after
+-- about 20 seconds in the worst case. Exceptions: 'letOrdersExecuteR' and
+-- 'submitOrder'.
+
 {-# LANGUAGE OverloadedStrings #-}
 
 module Network.MtGoxAPI.HttpAPI
@@ -14,15 +20,16 @@ module Network.MtGoxAPI.HttpAPI
     , OrderStats(..)
     ) where
 
-import Control.Arrow
 import Control.Error
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.Watchdog
 import Data.Aeson
 import Data.Digest.Pure.SHA
 import Network.Curl
 import Network.HTTP.Base (urlEncodeVars)
 
+import qualified Control.Arrow as A
 import qualified Data.Attoparsec as AP
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as B64
@@ -59,20 +66,26 @@ instance FromJSON HttpApiResult where
 mtGoxApi :: String
 mtGoxApi = "https://mtgox.com/api/"
 
+watchdogSettings :: WatchdogAction ()
+watchdogSettings = do
+    setInitialDelay 250000    -- 250 ms
+    setMaximumRetries 6
+    -- will fail after:
+    -- 0.25 + 0.5 + 1 + 2 + 4 + 8 seconds = 15.75 seconds
+
 parseReply ::  FromJSON a => String -> Value -> a
 parseReply method v =
     case fromJSON v of
         Success r -> r
         Error _ -> error ("Unexpected result when calling method " ++ method)
 
--- ^ Repeat an API call until it succeeds. Those functions which make use of
--- this helper are marked with the suffix 'R'.
-reliableApiCall :: Maybe WatchdogLogger -> IO (Either String a) -> IO a
-reliableApiCall mLogger f = watchdog $ do
+robustApiCall :: Maybe WatchdogLogger-> IO (Either String b) -> IO (Either String b)
+robustApiCall mLogger f = watchdog $ do
+    watchdogSettings
     case mLogger of
         Just logger -> setLoggingAction logger
         Nothing -> return ()
-    watch f
+    watchImpatiently f
 
 callApi :: CurlHandle -> MtGoxCredentials-> URLString-> [(String, String)]-> IO (Either String HttpApiResult)
 callApi curlHandle mtGoxCred uri parameters = do
@@ -104,14 +117,15 @@ compileRequest credentials parameters =
                   ]
     in (headers, body)
 
-getOrderCountR :: Maybe WatchdogLogger -> CurlHandle  -> MtGoxCredentials -> IO (Maybe OpenOrderCount)
+getOrderCountR :: Maybe WatchdogLogger -> CurlHandle  -> MtGoxCredentials -> IO (Either String OpenOrderCount)
 getOrderCountR mLogger curlHandle mtGoxCreds = do
     let uri = mtGoxApi ++ "1/generic/private/orders"
-    v <- reliableApiCall mLogger $ callApi curlHandle mtGoxCreds uri []
+    v <- robustApiCall mLogger $ callApi curlHandle mtGoxCreds uri []
     return $ case v of
-        HttpApiFailure -> Nothing
-        HttpApiSuccess v' ->
-            Just (parseReply "getOrderCountR" v') :: Maybe OpenOrderCount
+        Left errMsg -> Left errMsg
+        Right HttpApiFailure -> Left "HttpApiFailure when doing getOrderCountR"
+        Right (HttpApiSuccess v') ->
+            Right (parseReply "getOrderCountR" v') :: Either String OpenOrderCount
 
 submitBtcBuyOrder :: CurlHandle  -> MtGoxCredentials -> Integer -> IO (Either String Order)
 submitBtcBuyOrder curlHandle mtGoxCreds amount = do
@@ -141,7 +155,7 @@ submitBtcSellOrder curlHandle mtGoxCreds amount = do
         Right (HttpApiSuccess v') ->
             Right (parseReply "submitBtcSellOrder" v') :: Either String Order
 
-getOrderResultR :: Maybe WatchdogLogger-> CurlHandle -> MtGoxCredentials-> OrderType-> OrderID-> IO (Maybe OrderResult)
+getOrderResultR :: Maybe WatchdogLogger-> CurlHandle -> MtGoxCredentials-> OrderType-> OrderID-> IO (Either String OrderResult)
 getOrderResultR mLogger curlHandle mtGoxCreds orderType orderID = do
     let uri = mtGoxApi ++ "1/generic/private/order/result"
         parameters = [ ("type", case orderType of
@@ -149,41 +163,45 @@ getOrderResultR mLogger curlHandle mtGoxCreds orderType orderID = do
                                     OrderTypeSellBTC -> "ask")
                      , ("order", T.unpack (oid orderID))
                      ]
-    v <- reliableApiCall mLogger $ callApi curlHandle mtGoxCreds uri parameters
+    v <- robustApiCall mLogger $ callApi curlHandle mtGoxCreds uri parameters
     return $ case v of
-        HttpApiFailure -> Nothing
-        HttpApiSuccess v' -> 
-            Just (parseReply "getOrderResultR" v') :: Maybe OrderResult
+        Left errMsg -> Left errMsg
+        Right HttpApiFailure -> Left "HttpApiFailure when doing getOrderResultR"
+        Right (HttpApiSuccess v') ->
+            Right (parseReply "getOrderResultR" v') :: Either String OrderResult
 
-getWalletHistoryR :: Maybe WatchdogLogger-> CurlHandle -> MtGoxCredentials-> TradeID-> IO (Maybe WalletHistory)
+getWalletHistoryR :: Maybe WatchdogLogger-> CurlHandle -> MtGoxCredentials-> TradeID-> IO (Either String WalletHistory)
 getWalletHistoryR mLogger curlHandle mtGoxCreds tradeID = do
     let uri = mtGoxApi ++ "1/generic/private/wallet/history"
         parameters = [ ("currency", "USD")
                      , ("trade_id", T.unpack (tid tradeID))
                      ]
-    v <- reliableApiCall mLogger $ callApi curlHandle mtGoxCreds uri parameters
+    v <- robustApiCall mLogger $ callApi curlHandle mtGoxCreds uri parameters
     return $ case v of
-        HttpApiFailure -> Nothing
-        HttpApiSuccess v' -> 
-            Just (parseReply "getWalletHistoryR" v') :: Maybe WalletHistory
+        Left errMsg -> Left errMsg
+        Right HttpApiFailure -> Left "HttpApiFailure when doing getWalletHistoryR"
+        Right (HttpApiSuccess v') ->
+            Right (parseReply "getWalletHistoryR" v') :: Either String WalletHistory
 
-getPrivateInfoR :: Maybe WatchdogLogger-> CurlHandle  -> MtGoxCredentials -> IO (Maybe PrivateInfo)
+getPrivateInfoR :: Maybe WatchdogLogger-> CurlHandle  -> MtGoxCredentials -> IO (Either String PrivateInfo)
 getPrivateInfoR mLogger curlHandle mtGoxCreds = do
     let uri = mtGoxApi ++ "1/generic/private/info"
-    v <- reliableApiCall mLogger $ callApi curlHandle mtGoxCreds uri []
+    v <- robustApiCall mLogger $ callApi curlHandle mtGoxCreds uri []
     return $ case v of
-        HttpApiFailure -> Nothing
-        HttpApiSuccess v' -> 
-            Just (parseReply "getPrivateInfoR" v') :: Maybe PrivateInfo
+        Left errMsg -> Left errMsg
+        Right HttpApiFailure -> Left "HttpApiFailure when doing getPrivateInfoR"
+        Right (HttpApiSuccess v') -> 
+            Right (parseReply "getPrivateInfoR" v') :: Either String PrivateInfo
 
-getBitcoinDepositAddressR :: Maybe WatchdogLogger-> CurlHandle-> MtGoxCredentials-> IO (Maybe BitcoinDepositAddress)
+getBitcoinDepositAddressR :: Maybe WatchdogLogger-> CurlHandle-> MtGoxCredentials-> IO (Either String BitcoinDepositAddress)
 getBitcoinDepositAddressR mLogger curlHandle mtGoxCreds = do
     let uri = mtGoxApi ++ "1/generic/bitcoin/address"
-    v <- reliableApiCall mLogger $ callApi curlHandle mtGoxCreds uri []
+    v <- robustApiCall mLogger $ callApi curlHandle mtGoxCreds uri []
     return $ case v of
-        HttpApiFailure -> Nothing
-        HttpApiSuccess v' -> 
-            Just (parseReply "getBitcoinDepositAddressR" v') :: Maybe BitcoinDepositAddress
+        Left errMsg -> Left errMsg
+        Right HttpApiFailure -> Left "HttpApiFailure when doing getBitcoinDepositAddressR"
+        Right (HttpApiSuccess v') ->
+            Right (parseReply "getBitcoinDepositAddressR" v') :: Either String BitcoinDepositAddress
 
 withdrawBitcoins :: CurlHandle -> MtGoxCredentials-> BitcoinAddress-> Integer-> IO (Either String WithdrawResult)
 withdrawBitcoins curlHandle mtGoxCreds (BitcoinAddress addr) amount = do
@@ -199,27 +217,28 @@ withdrawBitcoins curlHandle mtGoxCreds (BitcoinAddress addr) amount = do
         Right (HttpApiSuccess v') ->
             Right (parseReply "withdrawBitcoins" v') :: Either String WithdrawResult
 
-letOrdersExecuteR :: Maybe WatchdogLogger-> CurlHandle  -> MtGoxCredentials -> IO (Maybe OpenOrderCount)
+-- | Will not return until all orders have been executed. It will give up after
+-- about 3 minutes, if there are persistent errors or still open orders.
+letOrdersExecuteR :: Maybe WatchdogLogger-> CurlHandle-> MtGoxCredentials-> IO (Either String ())
 letOrdersExecuteR mLogger curlHandle mtGoxCreds =
     watchdog $ do
-        setInitialDelay 200000 {- 200 ms -}
-        setMaximumDelay 100000000 {- 10 seconds -}
-        setLoggingAction silentLogger {- no logging -}
-        watch task
+       watchdogSettings
+       setLoggingAction silentLogger {- no logging -}
+       watchImpatiently task
   where
     task = do
         orderCount <- getOrderCountR mLogger curlHandle mtGoxCreds
-        case orderCount of
-            Nothing -> return $ Right Nothing
-            Just (OpenOrderCount count) ->
-                if count > 0
-                    then return $ Left "still outstanding orders"
-                    else return $ Right orderCount
+        return $ case orderCount of
+                    Left errMsg -> Left errMsg
+                    Right (OpenOrderCount count) ->
+                        if count > 0
+                            then Left "still outstanding orders"
+                            else Right ()
 
 processWalletHistories ::  [WalletHistory] -> OrderStats
 processWalletHistories histories =
     let entries = concatMap whEntries histories
-        amounts = map (weType &&& weAmount) entries
+        amounts = map (weType A.&&& weAmount) entries
         usdEarnedL = filter ((USDEarned ==) . fst) amounts
         usdSpentL = filter ((USDSpent ==) . fst) amounts
         usdFeeL = filter ((USDFee ==) . fst) amounts
@@ -228,16 +247,15 @@ processWalletHistories histories =
                   , usdFee = sum (map snd usdFeeL)
                   }
 
--- ^ Submit an order and return 'OrderStats'. In case of some non-critical
+-- | Submit an order and return 'OrderStats'. In case of some non-critical
 -- errors things are re-tried automatically, but if API errors happen or network
 -- errors occur during critical phases (like placing the order) a 'Left' with
--- the error is returned.
+-- the error is returned. Should not block longer than about 3 minutes.
 submitOrder :: Maybe WatchdogLogger-> CurlHandle -> MtGoxCredentials-> OrderType-> Integer-> IO (Either String OrderStats)
 submitOrder mLogger curlHandle mtGoxCreds orderType amount = runEitherT $ do
     -- step 1: make sure network connection is present
     --         and no orders are pending
-    (OpenOrderCount _) <- noteT "letOrdersExecute failed" . MaybeT $
-                            letOrdersExecuteR mLogger curlHandle mtGoxCreds
+    EitherT $ letOrdersExecuteR mLogger curlHandle mtGoxCreds
     -- step 2: submit order
     order <- EitherT $ case orderType of
                         OrderTypeBuyBTC ->
@@ -245,19 +263,19 @@ submitOrder mLogger curlHandle mtGoxCreds orderType amount = runEitherT $ do
                         OrderTypeSellBTC ->
                             submitBtcSellOrder curlHandle mtGoxCreds amount
     -- step 3: wait for order to complete
-    (OpenOrderCount _) <-
-        noteT "after submitting order letOrdersExecute failed" . MaybeT $
-            letOrdersExecuteR mLogger curlHandle mtGoxCreds
+    r <- liftIO $ letOrdersExecuteR mLogger curlHandle mtGoxCreds
+    case r of
+        Left errMsg -> left $ "Warning: After submitting order the call"
+                                ++ " to letOrdersExecuteR failed ("
+                                ++ errMsg ++ ")"
+        Right _ -> return ()
     -- step 4: get trade ids
     let orderID = oOrderID order
-    orderResult <-
-        noteT "getOrderResultR failed" . MaybeT $
-            getOrderResultR mLogger curlHandle mtGoxCreds orderType orderID
+    orderResult <- EitherT $ getOrderResultR mLogger curlHandle mtGoxCreds
+                                                orderType orderID
     let tradeIDs = orTradeIDs orderResult
     -- step 5: collect wallet entries for all trade ids
     histories <- forM tradeIDs $ \tradeID -> EitherT (getWalletHistory tradeID)
     return $ processWalletHistories histories
   where
-    getWalletHistory tradeID = do
-        history <- getWalletHistoryR mLogger curlHandle mtGoxCreds tradeID
-        return $ note "getWalletHistoryR failed" history
+    getWalletHistory = getWalletHistoryR mLogger curlHandle mtGoxCreds

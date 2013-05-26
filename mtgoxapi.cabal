@@ -1,5 +1,5 @@
 name:                mtgoxapi
-version:             0.3.1.2
+version:             0.4
 synopsis:            Library to communicate with Mt.Gox
 license:             MIT
 license-file:        LICENSE
@@ -57,7 +57,7 @@ test-suite testsuite
                  , hashable == 1.1.*
                  , aeson == 0.6.*
                  , time == 1.4.*
-                 , watchdog == 0.2.*
+                 , watchdog >= 0.2.2 && < 0.3
                  , base64-bytestring == 0.1.*
                  , base16-bytestring == 0.1.*
                  , SHA == 1.5.*
