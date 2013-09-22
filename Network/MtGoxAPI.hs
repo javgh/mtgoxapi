@@ -11,6 +11,8 @@ module Network.MtGoxAPI
     , getBitcoinDepositAddressR
     , withdrawBitcoins
     , submitOrder
+    , submitBtcBuyOrder
+    , submitBtcSellOrder
     , module Network.MtGoxAPI.Credentials
     , module Network.MtGoxAPI.Handles
     , module Control.Watchdog
@@ -74,6 +76,14 @@ withdrawBitcoins apiData = callHTTPApi' apiData H.withdrawBitcoins
 -- | Wrapper around 'H.submitOrder'
 submitOrder :: MtGoxAPIHandles-> OrderType -> Integer -> IO (Either String H.OrderStats)
 submitOrder apiData = callHTTPApi apiData H.submitOrder
+
+-- | Wrapper around 'H.submitBtcBuyOrder'
+submitBtcBuyOrder :: MtGoxAPIHandles -> Integer -> IO (Either String Order)
+submitBtcBuyOrder apiData = callHTTPApi' apiData H.submitBtcBuyOrder
+
+-- | Wrapper around 'H.submitBtcSellOrder'
+submitBtcSellOrder :: MtGoxAPIHandles -> Integer -> IO (Either String Order)
+submitBtcSellOrder apiData = callHTTPApi' apiData H.submitBtcSellOrder
 
 -- | Helper function to call functions from 'Network.MtGoxAPI.HttpAPI'.
 callHTTPApi :: MtGoxAPIHandles-> (Maybe WatchdogLogger -> CurlHandle -> MtGoxCredentials -> t)-> t
