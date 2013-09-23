@@ -14,6 +14,7 @@ import Network.MtGoxAPI.Credentials
 import Network.MtGoxAPI.StreamAuthCommands
 
 data StreamCommand = UnsubscribeCmd { scChannel :: T.Text }
+                     | SubscribeCmd { scChannel :: T.Text }
                      | PrivateSubscribeCmd { scKey :: T.Text }
                      | IDKeyCmd
                      | FullDepthCmd
@@ -25,6 +26,10 @@ encodeStreamCommand cmd creds = do
     let v = case cmd of
                 UnsubscribeCmd { scChannel = channel} ->
                     object [ "op" .= ("unsubscribe" :: T.Text)
+                           , "channel" .= channel
+                           ]
+                SubscribeCmd { scChannel = channel} ->
+                    object [ "op" .= ("mtgox.subscribe" :: T.Text)
                            , "channel" .= channel
                            ]
                 PrivateSubscribeCmd { scKey = key } ->

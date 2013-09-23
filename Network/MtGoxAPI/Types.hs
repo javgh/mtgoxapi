@@ -175,11 +175,11 @@ parseWallet wallet = do
     case op of
         "deposit" -> go BTCDeposit "BTC"
         "withdraw" -> go BTCWithdraw "BTC"
-        "earned" -> go USDEarned "USD"
-        "spent" -> go USDSpent "USD"
+        "earned" -> go USDEarned "EUR"
+        "spent" -> go USDSpent "EUR"
         "in" -> go BTCIn "BTC"
         "out" -> go BTCOut "BTC"
-        "fee" -> go USDFee "USD"
+        "fee" -> go USDFee "EUR"
         _ -> return OtherMessage
   where
     go checkedOp expCurrency = do
@@ -249,7 +249,7 @@ extractText (String s) = Just s
 extractText _ = Nothing
 
 expectedCurrency :: Value
-expectedCurrency = "USD"
+expectedCurrency = "EUR"
 
 parseLine :: B.ByteString -> Either String StreamMessage
 parseLine = collapseErrors . parseStreamMessage
@@ -288,9 +288,9 @@ instance FromJSON PrivateInfo
 extractBalancesAndOps :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Maybe (Value, Value, Value, Value)
 extractBalancesAndOps o = do
     btc <- extractBalance "BTC" o
-    usd <- extractBalance "USD" o
+    usd <- extractBalance "EUR" o
     btcOps <- extractOperations "BTC" o
-    usdOps <- extractOperations "USD" o
+    usdOps <- extractOperations "EUR" o
     return (btc, usd, btcOps, usdOps)
 
 extractOperations :: (Eq k, IsString k, Hashable k) =>T.Text -> H.HashMap k Value -> Maybe Value

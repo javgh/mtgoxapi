@@ -129,7 +129,7 @@ getOrderCountR mLogger curlHandle mtGoxCreds = do
 
 submitBtcBuyOrder :: CurlHandle  -> MtGoxCredentials -> Integer -> IO (Either String Order)
 submitBtcBuyOrder curlHandle mtGoxCreds amount = do
-    let uri = mtGoxApi ++ "1/BTCUSD/private/order/add"
+    let uri = mtGoxApi ++ "1/BTCEUR/private/order/add"
         parameters = [ ("type", "bid")
                      , ("amount_int", show amount)
                      , ("prefer_fiat_fee", "1")
@@ -143,7 +143,7 @@ submitBtcBuyOrder curlHandle mtGoxCreds amount = do
 
 submitBtcSellOrder :: CurlHandle  -> MtGoxCredentials -> Integer -> IO (Either String Order)
 submitBtcSellOrder curlHandle mtGoxCreds amount = do
-    let uri = mtGoxApi ++ "1/BTCUSD/private/order/add"
+    let uri = mtGoxApi ++ "1/BTCEUR/private/order/add"
         parameters = [ ("type", "ask")
                      , ("amount_int", show amount)
                      , ("prefer_fiat_fee", "1")
@@ -173,7 +173,7 @@ getOrderResultR mLogger curlHandle mtGoxCreds orderType orderID = do
 getWalletHistoryR :: Maybe WatchdogLogger-> CurlHandle -> MtGoxCredentials-> TradeID-> IO (Either String WalletHistory)
 getWalletHistoryR mLogger curlHandle mtGoxCreds tradeID = do
     let uri = mtGoxApi ++ "1/generic/private/wallet/history"
-        parameters = [ ("currency", "USD")
+        parameters = [ ("currency", "EUR")
                      , ("trade_id", T.unpack (tid tradeID))
                      ]
     v <- robustApiCall mLogger $ callApi curlHandle mtGoxCreds uri parameters

@@ -66,7 +66,7 @@ prepareCallPayload (StreamAuthCommandData { sacdCall = call
                         ]
         optionalAddon = if setBTCUSD
                             then [ "item" .= ("BTC" :: T.Text)
-                                 , "currency" .= ("USD" :: T.Text)
+                                 , "currency" .= ("EUR" :: T.Text)
                                  ]
                             else []
     in encode $ object (alwaysPresent ++ optionalAddon)

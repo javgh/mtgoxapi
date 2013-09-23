@@ -1,5 +1,5 @@
 name:                mtgoxapi
-version:             0.4.1
+version:             0.5
 synopsis:            Library to communicate with Mt.Gox
 license:             MIT
 license-file:        LICENSE

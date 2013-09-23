@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.MtGoxAPI.StreamConnection
     ( initMtGoxStream
-    , mtGoxTickerChannel
-    , mtGoxDepthChannel
+    , mtGoxTickerChannelUSD
+    , mtGoxDepthChannelUSD
+    , mtGoxTickerChannelNameEUR
+    , mtGoxDepthChannelNameEUR
     , mtGoxTradeChannel
     , MtGoxStreamSettings(..)
     , WalletNotifierSetting(..)
@@ -37,14 +39,20 @@ mtGoxStreamHost = "127.0.0.1"
 mtGoxStreamPort :: PortID
 mtGoxStreamPort = PortNumber 10508
 
-mtGoxTickerChannel :: T.Text
-mtGoxTickerChannel = "d5f06780-30a8-4a48-a2f8-7ed181b4a13f"
-
-mtGoxDepthChannel :: T.Text
-mtGoxDepthChannel = "24e67e0d-1cad-4cc0-9e7a-f8523ef460fe"
-
 mtGoxTradeChannel :: T.Text
 mtGoxTradeChannel = "dbf1dee9-4f2e-4a08-8cb7-748919a71b21"
+
+mtGoxTickerChannelUSD :: T.Text
+mtGoxTickerChannelUSD = "d5f06780-30a8-4a48-a2f8-7ed181b4a13f"
+
+mtGoxDepthChannelUSD :: T.Text
+mtGoxDepthChannelUSD = "24e67e0d-1cad-4cc0-9e7a-f8523ef460fe"
+
+mtGoxTickerChannelNameEUR :: T.Text
+mtGoxTickerChannelNameEUR = "ticker.BTCEUR"
+
+mtGoxDepthChannelNameEUR :: T.Text
+mtGoxDepthChannelNameEUR = "depth.BTCEUR"
 
 mtGoxTimeout :: Int
 mtGoxTimeout = 2 * 60 * 10 ^ (6 :: Integer)
@@ -80,10 +88,18 @@ openConnection host port creds streamSettings apiHandles = do
         h <- connectTo host port
         IO.hSetBuffering h IO.NoBuffering
 
-        -- wait for default subscribe messages; then unsubscribe
-        -- from trade channel
-        _ <- waitForSubscribesWithTimeout h
-        sendStreamCommand h creds $ UnsubscribeCmd mtGoxTradeChannel
+        -- unsubscribe from default channels and subscribe to
+        -- EUR channels
+        mapM_ (sendStreamCommand h creds) $
+            [ UnsubscribeCmd mtGoxTradeChannel
+            , UnsubscribeCmd mtGoxTickerChannelUSD
+            , UnsubscribeCmd mtGoxDepthChannelUSD
+            , SubscribeCmd mtGoxTickerChannelNameEUR
+            , SubscribeCmd mtGoxDepthChannelNameEUR
+            ]
+
+        -- wait for healthy activity to appear before proceeding
+        _ <- waitForActivityWithTimeout h
 
         -- prepare handles
         let tickerMonitorHandle = mtgoxTickerMonitorHandle apiHandles
@@ -143,20 +159,23 @@ waitForCallResultWithTimeout h parser =
                         throw $ userError "Unexpected call result was returned."
             other -> go (other:buffer)
 
-waitForSubscribesWithTimeout :: Handle -> IO [StreamMessage]
-waitForSubscribesWithTimeout h =
-    wrapInTimeout h "Subscribe messages did not appear in time." $ go []
+waitForActivityWithTimeout :: Handle -> IO [StreamMessage]
+waitForActivityWithTimeout h =
+    wrapInTimeout h "Healthy activity did not appear in time." $ go []
   where
     go msgs = do
         msg <- readNextStreamMessageWithTimeout h
         let msgs' = msg : msgs
-            checks = [ Subscribed mtGoxTickerChannel `elem` msgs'
-                     , Subscribed mtGoxDepthChannel `elem` msgs'
-                     , Subscribed mtGoxTradeChannel `elem` msgs'
+            checks = [ or (map isTickerUpdate msgs')
+                     , or (map isDepthUpdate msgs')
                      ]
         if and checks
             then return $ reverse msgs'
             else go msgs'
+    isTickerUpdate TickerUpdateUSD {} = True
+    isTickerUpdate _ = False
+    isDepthUpdate DepthUpdateUSD {} = True
+    isDepthUpdate _ = False
 
 -- | Starts a thread that will connect to the data stream
 -- from Mt. Gox and supply the received data to the handles that are

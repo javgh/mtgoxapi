@@ -55,7 +55,7 @@ simulateCircle handle usdAmount = do
 formatUSD :: Integer -> String
 formatUSD a =
     let a' = fromIntegral a / 10 ^ (5 :: Integer) :: Double
-    in printf "%.5f USD" a'
+    in printf "%.5f EUR" a'
 
 formatBTC :: Integer -> String
 formatBTC a =
