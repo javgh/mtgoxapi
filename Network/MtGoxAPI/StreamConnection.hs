@@ -90,7 +90,7 @@ openConnection host port creds streamSettings apiHandles = do
 
         -- unsubscribe from default channels and subscribe to
         -- EUR channels
-        mapM_ (sendStreamCommand h creds) $
+        mapM_ (sendStreamCommand h creds)
             [ UnsubscribeCmd mtGoxTradeChannel
             , UnsubscribeCmd mtGoxTickerChannelUSD
             , UnsubscribeCmd mtGoxDepthChannelUSD
@@ -166,8 +166,8 @@ waitForActivityWithTimeout h =
     go msgs = do
         msg <- readNextStreamMessageWithTimeout h
         let msgs' = msg : msgs
-            checks = [ or (map isTickerUpdate msgs')
-                     , or (map isDepthUpdate msgs')
+            checks = [ any isTickerUpdate msgs'
+                     , any isDepthUpdate msgs'
                      ]
         if and checks
             then return $ reverse msgs'

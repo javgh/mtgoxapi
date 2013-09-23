@@ -7,6 +7,7 @@ module Network.MtGoxAPI.WalletNotifier
 
 import Control.Applicative
 import Control.Concurrent
+import Control.Monad
 
 import Network.MtGoxAPI.Types
 
@@ -18,7 +19,7 @@ initWalletNotifier = WalletNotifierHandle <$> newEmptyMVar
 updateWalletNotifier :: WalletNotifierHandle -> StreamMessage -> IO ()
 updateWalletNotifier handle (wo@WalletOperation {}) =
     case woType wo of
-        BTCDeposit -> tryPutMVar (unWNH handle) () >> return ()
+        BTCDeposit -> void $ tryPutMVar (unWNH handle) ()
                             -- write to MVar, if not already full
         _ -> return ()
 updateWalletNotifier _ _ = return ()
@@ -27,4 +28,4 @@ updateWalletNotifier _ _ = return ()
 -- little unreliable, when the streaming connection is under load from a lot of
 -- depth channel updates.
 waitForBTCDeposit :: WalletNotifierHandle -> IO ()
-waitForBTCDeposit handle = takeMVar (unWNH handle) >> return ()
+waitForBTCDeposit handle = void $ takeMVar (unWNH handle)

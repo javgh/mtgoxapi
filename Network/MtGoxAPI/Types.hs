@@ -187,9 +187,9 @@ parseWallet wallet = do
         amount <- coerceFromString $ amountDetails .: "value_int"
         currency <- amountDetails .: "currency" :: Parser String
         if currency == expCurrency
-            then return $ WalletOperation { woType = checkedOp
-                                          , woAmount = amount
-                                          }
+            then return WalletOperation { woType = checkedOp
+                                        , woAmount = amount
+                                        }
             else mzero
 
 parseDepth :: (Eq k, IsString k, Hashable k) =>H.HashMap k Value -> Parser StreamMessage
