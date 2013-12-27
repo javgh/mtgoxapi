@@ -151,7 +151,7 @@ submitBtcSellOrder curlHandle mtGoxCreds amount = do
     v <- callApi curlHandle mtGoxCreds uri parameters
     return $ case v of
         Left errMsg -> Left errMsg
-        Right HttpApiFailure -> Left "HttpApiFailure when doing submitBtcBuyOrder"
+        Right HttpApiFailure -> Left "HttpApiFailure when doing submitBtcSellOrder"
         Right (HttpApiSuccess v') ->
             Right (parseReply "submitBtcSellOrder" v') :: Either String Order
 
