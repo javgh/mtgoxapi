@@ -210,7 +210,6 @@ withdrawBitcoins curlHandle mtGoxCreds (BitcoinAddress addr) amount = do
                      , ("amount_int", show amount)
                      ]
     v <- callApi curlHandle mtGoxCreds uri parameters
-    print v
     return $ case v of
         Left errMsg -> Left errMsg
         Right HttpApiFailure -> Left "HttpApiFailure when doing withdrawBitcoins"
