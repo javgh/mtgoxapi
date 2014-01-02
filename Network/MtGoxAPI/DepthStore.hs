@@ -152,7 +152,7 @@ repeatSimulation handle simulationAction = do
 
 -- | Simulate how much USD can be earned by selling the specified amount of BTC.
 -- The function will return 'NotEnoughDepth' in case there is not enough depth
--- to cover the full amount. If not recent data is available, it will return
+-- to cover the full amount. If no recent data is available, it will return
 -- 'DepthStoreUnavailable'. In the latter case it will have retried a few times
 -- before giving up. The function will not block for longer than about 20
 -- seconds.
