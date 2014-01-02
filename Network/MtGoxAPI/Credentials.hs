@@ -3,7 +3,6 @@
 module Network.MtGoxAPI.Credentials
     ( initMtGoxCredentials
     , MtGoxCredentials(..)
-    , debugCredentials
     ) where
 
 import Data.Word
@@ -44,14 +43,3 @@ initMtGoxCredentials authKey authSecret =
                         , mgcAuthSecret = authSecret
                         , mgcAuthSecretDecoded = authSecretDecoded
                         }
-
--- DEBUG data follows
-
-debugMtGoxAuthKey :: B.ByteString
-debugMtGoxAuthKey = "5be9c2b8-6f85-408d-a8de-18db2f5fc3af"
-
-debugMtGoxAuthSecret :: B.ByteString
-debugMtGoxAuthSecret = "A0seCE45EgkyUOliU3wokMuRwq/AbdpVMJ353kmDXtH0mWdy9QqsSKVkAer1AbfG4bYUO4YKVyh2ovO4pR1lag=="
-
-debugCredentials :: MtGoxCredentials
-debugCredentials = initMtGoxCredentials debugMtGoxAuthKey debugMtGoxAuthSecret

@@ -4,9 +4,14 @@ module Main where
 import Control.Applicative
 import Control.Error
 import Control.Monad.IO.Class
+import System.Environment
+import System.Exit
+import System.FilePath
 import Test.Framework
 import Test.Framework.Providers.HUnit
 import Test.HUnit hiding (Test)
+
+import qualified Data.ByteString.Char8 as B8
 
 import Network.MtGoxAPI
 import Network.MtGoxAPI.DepthStore.Tests
@@ -113,20 +118,39 @@ mtgoxAPITests = [ test1, test2, test3, test4, test5
 tests :: [Test]
 tests = depthStoreTests
 
-prepareAPI :: IO MtGoxAPIHandles
-prepareAPI =
+getConfFile :: FilePath -> FilePath
+getConfFile home = home </> ".mtgoxapi-testsuite"
+
+loadCredentials :: IO MtGoxCredentials
+loadCredentials = do
+    confFile <- getConfFile <$> getEnv "HOME"
+    keys <- lines <$> readFile confFile
+    case keys of
+        (authKey:authSecret:_) ->
+            return $ initMtGoxCredentials (B8.pack authKey)
+                                          (B8.pack authSecret)
+        _ -> do
+            putStrLn "Configuration file seems to be in wrong format.\
+                     \ At least two lines are expected, containing the key\
+                     \ and the secret."
+            exitFailure
+
+prepareAPI :: MtGoxCredentials -> IO MtGoxAPIHandles
+prepareAPI credentials =
     let streamSettings =
             MtGoxStreamSettings DisableWalletNotifications SkipFullDepth
-    in initMtGoxAPI (Just silentLogger) debugCredentials streamSettings
+    in initMtGoxAPI (Just silentLogger) credentials streamSettings
 
 main :: IO ()
 main = do
-    apiData <- prepareAPI
+    credentials <- loadCredentials
+    apiData <- prepareAPI credentials
     let apiTests = map ($ apiData) mtgoxAPITests
     defaultMain $ apiTests ++ tests
 
 manualSubmitOrderTest :: IO ()
 manualSubmitOrderTest = do
-    apiData <- prepareAPI
+    credentials <- loadCredentials
+    apiData <- prepareAPI credentials
     submitOrder apiData OrderTypeSellBTC cent >>= print
     submitOrder apiData OrderTypeBuyBTC cent >>= print
