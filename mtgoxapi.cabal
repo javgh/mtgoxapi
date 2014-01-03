@@ -1,5 +1,5 @@
 name:                mtgoxapi
-version:             0.5
+version:             0.5.0.1
 synopsis:            Library to communicate with Mt.Gox
 description:         See Network.MtGoxAPI for documentation.
 category:            Network
