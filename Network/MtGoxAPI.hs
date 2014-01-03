@@ -17,7 +17,7 @@
 -- function names still contain 'USD', because BTC/USD was the previously used
 -- pair. I apologize for this terrible source of confusion. I had planned to
 -- clean this up, but you know how priorities change around sometimes. Patches
--- to fix this properly, at the cost of breaking changes, and ideally make the
+-- to fix this properly, at the cost of breaking changes, and to ideally make the
 -- currency pair configurable are welcome.
 --
 -- Example usage:
