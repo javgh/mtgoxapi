@@ -1,3 +1,48 @@
+-- |
+-- This library offers a wrapper around the Mt.Gox API. It focuses, above all,
+-- on reliability, in that many actions - if they are idempotent - are
+-- automatically retried for some time in case of errors (using
+-- 'Control.Watchdog').
+--
+-- The library is able to maintain a copy of the current Mt.Gox order book by
+-- subscribing to real-time updates via the Mt.Gox websocket API. Based on this
+-- data the cost of hypothetical orders can then be calculated (e.g.
+-- 'simulateBTCBuy'). For this feature to work, it is necessary to run an
+-- instance of the MtGoxCachingProxy (
+-- https://github.com/javgh/MtGoxCachingProxy ) to which the library will
+-- connect (using port 10508 on localhost).
+--
+-- Example usage:
+--
+-- > import Network.MtGoxAPI
+-- >
+-- > import qualified Data.ByteString.Char8 as B8
+-- >
+-- > main :: IO ()
+-- > main = do
+-- >     putStrLn "Please provide your API key: "
+-- >     authKey <- getLine
+-- >     putStrLn "Please provide your API secret: "
+-- >     authSecret <- getLine
+-- >     let credentials = initMtGoxCredentials (B8.pack authKey)
+-- >                                            (B8.pack authSecret)
+-- >         streamSettings = MtGoxStreamSettings DisableWalletNotifications
+-- >                                              SkipFullDepth
+-- >     apiHandles <- initMtGoxAPI Nothing credentials streamSettings
+-- >     getPrivateInfoR apiHandles >>= print
+--
+-- Example output:
+--
+-- @
+-- Please provide your API key:
+-- ...
+-- Please provide your API secret:
+-- ...
+-- Right (PrivateInfo {piBtcBalance = 1000000, piUsdBalance = 846450,
+-- piBtcOperations = 441, piUsdOperations = 6, piFee = 0.45})
+-- @
+--
+
 module Network.MtGoxAPI
     ( initMtGoxAPI
     , getTickerStatus
