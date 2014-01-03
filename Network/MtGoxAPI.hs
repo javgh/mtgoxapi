@@ -12,6 +12,14 @@
 -- https://github.com/javgh/MtGoxCachingProxy ) to which the library will
 -- connect (using port 10508 on localhost).
 --
+-- NOTE: The library is currently hardcoded to work on the BTC/EUR pair for
+-- Mt.Gox only. This was done in a very hackish way, which is why many of the
+-- function names still contain 'USD', because BTC/USD was the previously used
+-- pair. I apologize for this terrible source of confusion. I had planned to
+-- clean this up, but you know how priorities change around sometimes. Patches
+-- to fix this properly, at the cost of breaking changes, and ideally make the
+-- currency pair configurable are welcome.
+--
 -- Example usage:
 --
 -- > import Network.MtGoxAPI
