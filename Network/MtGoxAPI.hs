@@ -2,14 +2,14 @@
 -- This library offers a wrapper around the Mt.Gox API. It focuses, above all,
 -- on reliability, in that many actions - if they are idempotent - are
 -- automatically retried for some time in case of errors (using
--- 'Control.Watchdog').
+-- "Control.Watchdog").
 --
 -- The library is able to maintain a copy of the current Mt.Gox order book by
 -- subscribing to real-time updates via the Mt.Gox websocket API. Based on this
 -- data the cost of hypothetical orders can then be calculated (e.g.
 -- 'simulateBTCBuy'). For this feature to work, it is necessary to run an
 -- instance of the MtGoxCachingProxy (
--- https://github.com/javgh/MtGoxCachingProxy ) to which the library will
+-- <https://github.com/javgh/MtGoxCachingProxy> ) to which the library will
 -- connect (using port 10508 on localhost).
 --
 -- NOTE: The library is currently hardcoded to work on the BTC/EUR pair for
